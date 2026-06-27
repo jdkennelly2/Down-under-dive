@@ -1,0 +1,456 @@
+<title>Home Power Analysis — 36 Orana</title>
+<meta name="description" content="Solar generation, grid usage and tariff comparison for 36 Orana's SolaX solar and battery system.">
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#F5F7FA;
+  --surface:#FFFFFF;
+  --navy:#0D1F35;
+  --solar:#E8971E;
+  --solar-lt:#FEF3C7;
+  --green:#16A34A;
+  --green-lt:#DCFCE7;
+  --blue:#2563EB;
+  --red:#DC2626;
+  --red-lt:#FEE2E2;
+  --text:#1E293B;
+  --muted:#64748B;
+  --faint:#94A3B8;
+  --border:#E2E8F0;
+  --shadow:0 1px 3px rgba(0,0,0,.07);
+}
+
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  font-size:15px;
+  line-height:1.6;
+  padding:28px 16px 64px;
+}
+
+.report{max-width:800px;margin:0 auto}
+
+/* Header */
+.report-header{
+  display:flex;justify-content:space-between;align-items:flex-start;
+  gap:20px;flex-wrap:wrap;padding-bottom:24px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);
+}
+.eyebrow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.pip{width:10px;height:10px;background:var(--solar);border-radius:50%;flex-shrink:0}
+.eyebrow-txt{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.report-title{font-size:24px;font-weight:700;color:var(--navy);letter-spacing:-.3px;line-height:1.2}
+.report-date{font-size:13px;color:var(--muted);margin-top:4px}
+.pills{display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+.pill{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--border);
+  border-radius:99px;padding:3px 10px;white-space:nowrap}
+.pill strong{color:var(--navy);font-weight:600}
+
+/* Section */
+.section{margin-bottom:36px}
+.section-hd{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.section-lbl{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.section-rule{flex:1;height:1px;background:var(--border)}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:18px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.navy::before{background:var(--navy)}
+.kpi.solar::before{background:var(--solar)}
+.kpi.green::before{background:var(--green)}
+.kpi.blue::before{background:var(--blue)}
+.kpi-val{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;
+  line-height:1;color:var(--navy);margin-bottom:6px}
+.kpi-unit{font-size:16px;font-weight:500;color:var(--muted)}
+.kpi-lbl{font-size:12px;color:var(--muted);font-weight:500}
+.kpi-note{font-size:11px;color:var(--faint);margin-top:3px}
+
+/* Card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:22px;box-shadow:var(--shadow)}
+.card-title{font-size:15px;font-weight:600;color:var(--navy)}
+.card-sub{font-size:13px;color:var(--muted);margin-top:2px;margin-bottom:20px}
+
+/* Chart */
+.chart-wrap{display:flex;flex-direction:column;gap:20px}
+.chart-row{display:flex;flex-direction:column;gap:5px}
+.chart-row-lbl{font-size:12px;font-weight:600;color:var(--muted);
+  display:flex;justify-content:space-between;align-items:center}
+.chart-total{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--navy)}
+.chart-bars{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;height:64px;align-items:flex-end}
+.bar-col{display:flex;flex-direction:column;align-items:center;height:100%;
+  justify-content:flex-end;position:relative;cursor:default}
+.bar-col:hover .tip{display:block}
+.bar{width:100%;border-radius:2px 2px 0 0}
+.bar.n{background:var(--solar);opacity:.85}
+.bar-col:hover .bar.n{opacity:1}
+.bar.p{background:var(--red);opacity:.4}
+.bar.off{background:var(--red);opacity:.15;height:4px!important;border-radius:2px}
+.bar.fut{background:var(--border);height:6px;border-radius:2px}
+.bar.mtd{background:var(--solar);opacity:.55}
+.tip{display:none;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);
+  background:var(--navy);color:#fff;font-size:11px;white-space:nowrap;
+  padding:3px 7px;border-radius:4px;z-index:10;font-variant-numeric:tabular-nums}
+.chart-months{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;margin-top:3px}
+.mo{font-size:9px;color:var(--faint);text-align:center}
+.chart-legend{display:flex;gap:14px;margin-top:14px;flex-wrap:wrap}
+.leg{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+.sw{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.sw.n{background:var(--solar)}
+.sw.p{background:var(--red);opacity:.45}
+.sw.off{background:var(--red);opacity:.2}
+.sw.fut{background:var(--border)}
+
+/* Alert */
+.alert{margin-top:14px;background:var(--red-lt);border:1px solid #FECACA;
+  border-left:3px solid var(--red);border-radius:6px;padding:11px 14px;
+  font-size:13px;color:#991B1B}
+.alert strong{font-weight:600}
+
+/* Bill */
+.bill-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:560px){.bill-grid,.pills{grid-template-columns:1fr}}
+.bill-lbl{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:10px}
+.bill-ln{display:flex;justify-content:space-between;align-items:center;
+  padding:8px 0;border-bottom:1px solid var(--border);font-size:14px}
+.bill-ln:last-child{border-bottom:none}
+.bill-ln.sub{font-weight:600;color:var(--navy)}
+.bill-ln.tot{font-weight:700;font-size:16px;color:var(--navy);
+  border-top:2px solid var(--navy);border-bottom:none;padding-top:12px;margin-top:4px}
+.amt{font-variant-numeric:tabular-nums;font-weight:500}
+.amt.cr{color:var(--green);font-weight:600}
+.rate{font-size:11px;color:var(--faint);margin-top:1px}
+
+/* Tariff table */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:520px}
+thead th{text-align:left;padding:9px 12px;font-size:11px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+  border-bottom:2px solid var(--border);white-space:nowrap}
+tbody td{padding:13px 12px;border-bottom:1px solid var(--border);
+  vertical-align:top;font-variant-numeric:tabular-nums}
+tbody tr:last-child td{border-bottom:none}
+tr.cur{background:#FFFDF5}
+tr.rec{background:#F0FDF4}
+.tn{font-weight:600;color:var(--navy);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.td{font-size:12px;color:var(--muted);margin-top:2px}
+.badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;padding:2px 6px;border-radius:4px}
+.bc{background:#DBEAFE;color:#1D4ED8}
+.br{background:#DCFCE7;color:#15803D}
+.bo{background:#F3F4F6;color:var(--muted)}
+.sv{color:var(--green);font-weight:700}
+.cst{font-weight:600}
+
+/* Recs */
+.recs{display:flex;flex-direction:column;gap:12px}
+.rec{display:grid;grid-template-columns:36px 1fr;gap:14px;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:18px;
+  box-shadow:var(--shadow);align-items:start}
+.rn{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:14px;font-weight:700;flex-shrink:0}
+.rn1{background:var(--solar);color:#fff}
+.rn2{background:var(--green);color:#fff}
+.rn3{background:var(--blue);color:#fff}
+.rn4{background:var(--navy);color:#fff}
+.rec-title{font-size:15px;font-weight:600;color:var(--navy);line-height:1.3;margin-bottom:5px}
+.rec-body{font-size:13px;color:var(--muted);line-height:1.55}
+.rec-body strong{color:var(--text)}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;
+  border-radius:4px;margin-top:8px;margin-right:4px}
+.tg-sv{background:var(--green-lt);color:#15803D}
+.tg-ac{background:#DBEAFE;color:#1D4ED8}
+.tg-wa{background:var(--red-lt);color:var(--red)}
+
+/* Footer */
+.rpt-footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--border);
+  font-size:12px;color:var(--faint);line-height:1.6}
+</style>
+
+<div class="report">
+
+  <header class="report-header">
+    <div>
+      <div class="eyebrow"><div class="pip"></div><span class="eyebrow-txt">Power Analysis Report</span></div>
+      <h1 class="report-title">36 Orana — Solar &amp; Energy Review</h1>
+      <p class="report-date">Prepared 27 June 2026 &mdash; data through June 2026</p>
+    </div>
+    <div class="pills">
+      <div class="pill"><strong>10 kW</strong> solar array / 5 kW SolaX inverter</div>
+      <div class="pill"><strong>10 kWh</strong> LG RESU10 battery (5 kW output)</div>
+      <div class="pill">Commissioned February 2021</div>
+      <div class="pill">Currently on Ergon Tariff 11</div>
+    </div>
+  </header>
+
+  <!-- KPIs -->
+  <section class="section">
+    <div class="section-hd"><span class="section-lbl">At a glance</span><div class="section-rule"></div></div>
+    <div class="kpi-grid">
+      <div class="kpi navy">
+        <div class="kpi-val">$159<span class="kpi-unit">.33</span></div>
+        <div class="kpi-lbl">Latest monthly bill</div>
+        <div class="kpi-note">26 Apr – 26 May 2026 (30 days)</div>
+      </div>
+      <div class="kpi solar">
+        <div class="kpi-val">3,963<span class="kpi-unit"> kWh</span></div>
+        <div class="kpi-lbl">2026 solar yield (YTD)</div>
+        <div class="kpi-note">On track for ~7,900 kWh for the full year</div>
+      </div>
+      <div class="kpi green">
+        <div class="kpi-val">87<span class="kpi-unit">%</span></div>
+        <div class="kpi-lbl">Self-consumption rate</div>
+        <div class="kpi-note">Only 13% of generation exported to grid</div>
+      </div>
+      <div class="kpi blue">
+        <div class="kpi-val">11.7<span class="kpi-unit"> kWh</span></div>
+        <div class="kpi-lbl">Avg daily grid import</div>
+        <div class="kpi-note">Total daily use ≈ 30 kWh incl. solar</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Chart -->
+  <section class="section">
+    <div class="section-hd"><span class="section-lbl">Solar generation history</span><div class="section-rule"></div></div>
+    <div class="card">
+      <div class="card-title">Monthly solar yield (kWh)</div>
+      <div class="card-sub">10 kW array / 5 kW inverter — all years on the same scale. Peak: 931 kWh (Oct 2024)</div>
+
+      <div class="chart-wrap">
+        <!-- 2024 -->
+        <div class="chart-row">
+          <div class="chart-row-lbl"><span>2024</span><span class="chart-total">8,985 kWh — full year</span></div>
+          <div class="chart-bars">
+            <div class="bar-col"><div class="tip">Jan: 814 kWh</div><div class="bar n" style="height:56px"></div></div>
+            <div class="bar-col"><div class="tip">Feb: 684 kWh</div><div class="bar n" style="height:47px"></div></div>
+            <div class="bar-col"><div class="tip">Mar: 666 kWh</div><div class="bar n" style="height:46px"></div></div>
+            <div class="bar-col"><div class="tip">Apr: 682 kWh</div><div class="bar n" style="height:47px"></div></div>
+            <div class="bar-col"><div class="tip">May: 597 kWh</div><div class="bar n" style="height:41px"></div></div>
+            <div class="bar-col"><div class="tip">Jun: 651 kWh</div><div class="bar n" style="height:45px"></div></div>
+            <div class="bar-col"><div class="tip">Jul: 651 kWh</div><div class="bar n" style="height:45px"></div></div>
+            <div class="bar-col"><div class="tip">Aug: 758 kWh</div><div class="bar n" style="height:52px"></div></div>
+            <div class="bar-col"><div class="tip">Sep: 782 kWh</div><div class="bar n" style="height:54px"></div></div>
+            <div class="bar-col"><div class="tip">Oct: 931 kWh</div><div class="bar n" style="height:64px"></div></div>
+            <div class="bar-col"><div class="tip">Nov: 912 kWh</div><div class="bar n" style="height:63px"></div></div>
+            <div class="bar-col"><div class="tip">Dec: 857 kWh</div><div class="bar n" style="height:59px"></div></div>
+          </div>
+        </div>
+        <!-- 2025 -->
+        <div class="chart-row">
+          <div class="chart-row-lbl"><span>2025</span><span class="chart-total" style="color:var(--red)">System offline Jul–Oct</span></div>
+          <div class="chart-bars">
+            <div class="bar-col"><div class="tip">Jan: 899 kWh</div><div class="bar n" style="height:62px"></div></div>
+            <div class="bar-col"><div class="tip">Feb: 698 kWh</div><div class="bar n" style="height:48px"></div></div>
+            <div class="bar-col"><div class="tip">Mar: 740 kWh</div><div class="bar n" style="height:51px"></div></div>
+            <div class="bar-col"><div class="tip">Apr: 662 kWh</div><div class="bar n" style="height:45px"></div></div>
+            <div class="bar-col"><div class="tip">May: 597 kWh</div><div class="bar n" style="height:41px"></div></div>
+            <div class="bar-col"><div class="tip">Jun: 180 kWh (partial)</div><div class="bar p" style="height:12px"></div></div>
+            <div class="bar-col"><div class="tip">Jul: offline</div><div class="bar off"></div></div>
+            <div class="bar-col"><div class="tip">Aug: offline</div><div class="bar off"></div></div>
+            <div class="bar-col"><div class="tip">Sep: offline</div><div class="bar off"></div></div>
+            <div class="bar-col"><div class="tip">Oct: offline</div><div class="bar off"></div></div>
+            <div class="bar-col"><div class="tip">Nov: 812 kWh</div><div class="bar n" style="height:56px"></div></div>
+            <div class="bar-col"><div class="tip">Dec: 880 kWh</div><div class="bar n" style="height:60px"></div></div>
+          </div>
+        </div>
+        <!-- 2026 -->
+        <div class="chart-row">
+          <div class="chart-row-lbl"><span>2026</span><span class="chart-total">3,963 kWh — Jan to Jun</span></div>
+          <div class="chart-bars">
+            <div class="bar-col"><div class="tip">Jan: 779 kWh</div><div class="bar n" style="height:54px"></div></div>
+            <div class="bar-col"><div class="tip">Feb: 728 kWh</div><div class="bar n" style="height:50px"></div></div>
+            <div class="bar-col"><div class="tip">Mar: 667 kWh</div><div class="bar n" style="height:46px"></div></div>
+            <div class="bar-col"><div class="tip">Apr: 639 kWh</div><div class="bar n" style="height:44px"></div></div>
+            <div class="bar-col"><div class="tip">May: 655 kWh</div><div class="bar n" style="height:45px"></div></div>
+            <div class="bar-col"><div class="tip">Jun: 495 kWh (month to date)</div><div class="bar mtd" style="height:34px"></div></div>
+            <div class="bar-col"><div class="bar fut"></div></div>
+            <div class="bar-col"><div class="bar fut"></div></div>
+            <div class="bar-col"><div class="bar fut"></div></div>
+            <div class="bar-col"><div class="bar fut"></div></div>
+            <div class="bar-col"><div class="bar fut"></div></div>
+            <div class="bar-col"><div class="bar fut"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-months">
+        <div class="mo">Jan</div><div class="mo">Feb</div><div class="mo">Mar</div>
+        <div class="mo">Apr</div><div class="mo">May</div><div class="mo">Jun</div>
+        <div class="mo">Jul</div><div class="mo">Aug</div><div class="mo">Sep</div>
+        <div class="mo">Oct</div><div class="mo">Nov</div><div class="mo">Dec</div>
+      </div>
+
+      <div class="chart-legend">
+        <div class="leg"><div class="sw n"></div>Normal generation</div>
+        <div class="leg"><div class="sw p"></div>Disrupted / partial</div>
+        <div class="leg"><div class="sw off"></div>System offline</div>
+        <div class="leg"><div class="sw fut"></div>Future months</div>
+      </div>
+
+      <div class="alert">
+        <strong>2025 outage impact:</strong> Approximately 5 months offline (mid-June through October). Matching 2024 production for those months (~2,900 kWh expected) suggests an estimated <strong>$760–$870 in extra grid electricity costs</strong> during that period.
+      </div>
+    </div>
+  </section>
+
+  <!-- Bill -->
+  <section class="section">
+    <div class="section-hd"><span class="section-lbl">Most recent bill breakdown</span><div class="section-rule"></div></div>
+    <div class="card">
+      <div class="card-title">Ergon Tariff 11 — 26 April to 26 May 2026</div>
+      <div class="card-sub">30 days &bull; Residential flat rate &bull; Interval meter confirmed</div>
+      <div class="bill-grid">
+        <div>
+          <div class="bill-lbl">Charges</div>
+          <div class="bill-ln">
+            <div><div>Usage — 352.3 kWh</div><div class="rate">@ 29.975¢/kWh</div></div>
+            <div class="amt">$116.17</div>
+          </div>
+          <div class="bill-ln">
+            <div><div>Daily supply fee</div><div class="rate">30 days @ $1.535/day</div></div>
+            <div class="amt">$50.66</div>
+          </div>
+          <div class="bill-ln sub">
+            <span>Total charges (inc. GST)</span><span class="amt">$166.83</span>
+          </div>
+        </div>
+        <div>
+          <div class="bill-lbl">Solar credits &amp; summary</div>
+          <div class="bill-ln">
+            <div><div>Solar export — 86.6 kWh</div><div class="rate">@ 8.66¢/kWh feed-in</div></div>
+            <div class="amt cr">−$7.50</div>
+          </div>
+          <div class="bill-ln"><span>Avg daily import</span><span class="amt">11.74 kWh/day</span></div>
+          <div class="bill-ln"><span>Avg daily export</span><span class="amt">2.90 kWh/day</span></div>
+          <div class="bill-ln tot"><span>Amount due</span><span class="amt">$159.33</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tariff comparison -->
+  <section class="section">
+    <div class="section-hd"><span class="section-lbl">Tariff comparison</span><div class="section-rule"></div></div>
+    <div class="card">
+      <div class="card-title">Ergon available tariffs — estimated annual impact</div>
+      <div class="card-sub">Based on 11.74 kWh/day avg import and 2.90 kWh/day avg export. Tariff 12A rates are approximate — confirm with Ergon before switching.</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Tariff</th>
+              <th>Import rate</th>
+              <th>Supply/day</th>
+              <th>Feed-in</th>
+              <th>Est. annual net</th>
+              <th>vs. current</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="cur">
+              <td>
+                <div class="tn">Tariff 11 <span class="badge bc">Current</span></div>
+                <div class="td">Flat rate domestic — same price all day, every day</div>
+              </td>
+              <td>29.98¢ flat</td>
+              <td>$1.535</td>
+              <td>8.66¢</td>
+              <td class="cst">~$1,780/yr</td>
+              <td>—</td>
+            </tr>
+            <tr class="rec">
+              <td>
+                <div class="tn">Tariff 12A <span class="badge br">Recommended</span></div>
+                <div class="td">Time of use — your 10 kWh battery covers most of the peak window (4–9 pm)</div>
+              </td>
+              <td>~44¢ peak (4–9 pm weekdays)<br>~18¢ off-peak (all other times)</td>
+              <td>~$1.535</td>
+              <td>8.66¢</td>
+              <td class="cst">~$1,420–1,490/yr</td>
+              <td class="sv">−$290–360/yr</td>
+            </tr>
+            <tr>
+              <td>
+                <div class="tn">Tariff 31 <span class="badge bo">Add-on</span></div>
+                <div class="td">Controlled load overnight rate — for hot water system or pool pump, run alongside T11 or T12A</div>
+              </td>
+              <td>~13¢ overnight only</td>
+              <td>Included</td>
+              <td>—</td>
+              <td class="cst">—</td>
+              <td class="sv">−$300–425/yr*</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12px;color:var(--faint);margin-top:10px">* Tariff 31 saving applies only if you have electric hot water or a pool pump not already on controlled load.</p>
+    </div>
+  </section>
+
+  <!-- Recommendations -->
+  <section class="section">
+    <div class="section-hd"><span class="section-lbl">Recommendations</span><div class="section-rule"></div></div>
+    <div class="recs">
+
+      <div class="rec">
+        <div class="rn rn1">1</div>
+        <div>
+          <div class="rec-title">Request your interval data, then switch to Tariff 12A</div>
+          <div class="rec-body">
+            Call Ergon on <strong>13 10 46</strong> and ask for 12 months of 30-minute interval data from your smart meter — it's free and shows exactly when you import from the grid. With your 10 kWh battery charged by solar each day, the 4–9 pm peak window is likely already covered, making the off-peak rate very advantageous. The data confirms this before you commit to switching. Estimated saving: <strong>$290–$360/year</strong>.
+          </div>
+          <span class="tag tg-sv">Est. saving: $290–$360/yr</span>
+          <span class="tag tg-ac">Call Ergon: 13 10 46</span>
+        </div>
+      </div>
+
+      <div class="rec">
+        <div class="rn rn2">2</div>
+        <div>
+          <div class="rec-title">Add Tariff 31 if you have electric hot water or a pool</div>
+          <div class="rec-body">
+            Tariff 31 (Controlled Load) runs nominated appliances overnight at ~13¢/kWh — less than half your current flat rate. If your hot water system or pool pump runs off the grid overnight, this is an easy win. It sits alongside your main tariff and requires an electrician to move the circuit. Typical saving for a Queensland household: <strong>$300–$425/year</strong>.
+          </div>
+          <span class="tag tg-sv">Est. saving: $300–$425/yr if applicable</span>
+          <span class="tag tg-ac">Ask a local electrician</span>
+        </div>
+      </div>
+
+      <div class="rec">
+        <div class="rn rn3">3</div>
+        <div>
+          <div class="rec-title">Investigate the 2025 system outage</div>
+          <div class="rec-body">
+            The system produced nothing for ~4 months in 2025 (July–October) and was low in June. As new owners this is worth understanding — inverter fault, WiFi/monitoring disconnection, or a commissioning gap during the ownership transition. Check the SolaX portal's Alarm Record tab for fault codes. If it was a hardware issue it may still be under the 5-year inverter warranty (commissioned Feb 2021). The outage cost an estimated <strong>~$800 in avoidable grid electricity</strong>.
+          </div>
+          <span class="tag tg-wa">Outage cost: ~$800 estimated</span>
+          <span class="tag tg-ac">Check Alarm Record in SolaX portal</span>
+        </div>
+      </div>
+
+      <div class="rec">
+        <div class="rn rn4">4</div>
+        <div>
+          <div class="rec-title">Your 87% self-consumption rate is excellent — protect it</div>
+          <div class="rec-body">
+            At 8.66¢ feed-in vs 30¢ import, every kWh you export is worth 3.5× less than one you use yourself. The battery is already doing most of the work. To squeeze more value: run the dishwasher, washing machine, and any pool pump during solar hours (roughly 9 am–3 pm). Check the SolaX app's battery operating mode is set to <strong>Self Use</strong>, not grid export or scheduled mode. Avoid shifting large loads to evening peak hours (4–9 pm) if you switch to Tariff 12A.
+          </div>
+          <span class="tag tg-ac">Check battery mode in SolaX app → Batteries tab</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="rpt-footer">
+    Analysis based on SolaX portal generation data (2024–2026 YTD), Ergon bill dated 26 May 2026, and Ergon's published Tariff 11 rates. Tariff 12A rates (~44¢ peak / ~18¢ off-peak) are approximate — verify current rates at ergon.com.au before switching. TOU savings estimate assumes 85–90% of grid import occurs during off-peak hours, consistent with typical solar-plus-battery behaviour. Seasonal consumption variation is not accounted for in annual estimates — actual results will vary.
+  </footer>
+
+</div>
