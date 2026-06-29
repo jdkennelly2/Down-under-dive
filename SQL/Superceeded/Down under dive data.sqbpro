@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><sqlb_project><db path="Down under dive data.db" readonly="0" foreign_keys="1" case_sensitive_like="0" temp_store="0" wal_autocheckpoint="1000" synchronous="2"/><attached/><window><main_tabs open="structure browser pragmas query" current="3"/></window><tab_structure><column_width id="0" width="300"/><column_width id="1" width="0"/><column_width id="2" width="100"/><column_width id="3" width="1500"/><column_width id="4" width="0"/><expanded_item id="0" parent="1"/><expanded_item id="0" parent="0"/><expanded_item id="1" parent="1"/><expanded_item id="2" parent="1"/><expanded_item id="3" parent="1"/></tab_structure><tab_browse><table title="dive_data" custom_title="0" dock_id="1" table="4,9:maindive_data"/><dock_state state="000000ff00000000fd00000001000000020000077400000386fc0100000001fb000000160064006f0063006b00420072006f00770073006500310100000000000007740000012300ffffff000002570000000000000004000000040000000800000008fc00000000"/><default_encoding codec=""/><browse_table_settings><table schema="main" name="dive_data" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_" freeze_columns="0"><sort/><column_widths><column index="1" value="78"/><column index="2" value="39"/><column index="3" value="39"/><column index="4" value="64"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table></browse_table_settings></tab_browse><tab_sql><sql name="SQL 1*">WITH ordered_data AS (
+    SELECT 
+        year_num,
+        month,
+        pax,
+        CASE month
+            WHEN 'July' THEN 1
+            WHEN 'August' THEN 2
+            WHEN 'September' THEN 3
+            WHEN 'Oct' THEN 4
+            WHEN 'Nov' THEN 5
+            WHEN 'Dec' THEN 6
+            WHEN 'Jan' THEN 7
+            WHEN 'Feb' THEN 8
+            WHEN 'March' THEN 9
+            WHEN 'April' THEN 10
+            WHEN 'May' THEN 11
+            WHEN 'June' THEN 12
+        END as month_num
+    FROM dive_data
+),
+
+rolling AS (
+    SELECT
+        year_num,
+        month,
+        month_num,
+        SUM(pax) OVER (
+            PARTITION BY year_num
+            ORDER BY month_num
+            ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+        ) AS rolling_3_month
+    FROM ordered_data
+),
+
+with_start AS (
+    SELECT *,
+        CASE (month_num - 2)
+            WHEN 1 THEN 'July'
+            WHEN 2 THEN 'August'
+            WHEN 3 THEN 'September'
+            WHEN 4 THEN 'Oct'
+            WHEN 5 THEN 'Nov'
+            WHEN 6 THEN 'Dec'
+            WHEN 7 THEN 'Jan'
+            WHEN 8 THEN 'Feb'
+            WHEN 9 THEN 'March'
+            WHEN 10 THEN 'April'
+            WHEN 11 THEN 'May'
+            WHEN 12 THEN 'June'
+        END AS start_month
+    FROM rolling
+),
+
+ranked AS (
+    SELECT *,
+        ROW_NUMBER() OVER (
+            PARTITION BY year_num
+            ORDER BY rolling_3_month DESC
+        ) AS rn
+    FROM with_start
+)
+
+SELECT
+    year_num,
+    start_month,
+    month AS end_month,
+    rolling_3_month
+FROM ranked
+WHERE rn &lt;= 3
+ORDER BY year_num, rolling_3_month DESC;</sql><current_tab id="0"/></tab_sql></sqlb_project>

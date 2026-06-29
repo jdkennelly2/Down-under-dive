@@ -1,0 +1,12 @@
+event_name,event_type,category,start_date,end_date,year,month,year_qtr_sort,cairns_relevance,notes
+TC Tasha + Dec 2010 floods,Cyclone + flooding,Cat 1,2010-12-25,2011-01-10,2010,12,20104,Direct,"Crossed coast near Gordonvale just south of Cairns; ~250mm, triggered major regional flooding."
+Severe TC Yasi,Cyclone,Cat 5,2011-02-02,2011-02-03,2011,2,20111,Regional,Landfall near Mission Beach ~138km south of Cairns; est. wind gusts to 285km/h. Costliest Australian cyclone on record at the time.
+Severe TC Ita,Cyclone + flooding,Cat 4,2014-04-11,2014-04-14,2014,4,20142,Regional,Landfall near Cape Flattery (north of Cooktown) as Cat 4; flooding and rescues between Cooktown and Cairns.
+Ex-TC Winston (regional rain),Ex-cyclone flooding,,2016-03-03,2016-03-05,2016,3,20161,Regional,Remnants of Cat 5 Winston (which devastated Fiji) crossed near Cairns; heaviest falls SOUTH of Cairns (Feluga 215mm). Cairns city rainfall stayed moderate (~258mm for the month).
+Ex-TC Nora flash flooding,Ex-cyclone flooding,Cat 3,2018-03-26,2018-03-28,2018,3,20181,Direct,"Nora crossed Cape York as Cat 3; its remnant low caused severe flash flooding in Cairns 26-27 Mar - 40+ swift-water rescues, shopping centre & hotel inundated, Port Douglas 593mm in 24h."
+TC Owen,Cyclone + flooding,Cat 3,2018-12-11,2018-12-15,2018,12,20184,Regional,Landfall in Far North Queensland mid-Dec; flooding rains across the region (Halifax 681mm in 24h).
+2019 NQ monsoon floods,Monsoon flooding,,2019-01-25,2019-02-10,2019,1,20191,Regional,Prolonged monsoon low; record flooding centred on Townsville with heavy rain across FNQ (Cairns ~826mm in January).
+TC Niran,Cyclone,,2021-03-02,2021-03-05,2021,3,20211,Regional,Developed off Cairns then tracked offshore to the SE (intensifying to Cat 5 over open water); main FNQ impact was wind and ~A$200m banana-crop damage near Innisfail. Limited Cairns rainfall.
+March 2024 monsoon floods,Monsoon flooding,,2024-03-01,2024-03-10,2024,3,20241,Direct,"Monsoon flooding across FNQ; Captain Cook Hwy (Cairns-Port Douglas) closed, Tully and surrounds inundated. Cairns ~892mm for the month."
+Ex-TC Jasper flooding,Ex-cyclone flooding,Cat 2,2023-12-13,2023-12-28,2023,12,20234,Direct,"Landfall near Wujal Wujal as Cat 2; wettest cyclone in Australian history. Barron River broke its 1977 record, Cairns Airport inundated, ~40,000 without power."
+Jan 2026 NQ monsoon floods,Monsoon flooding,,2026-01-01,2026-01-31,2026,1,20261,Regional,Prolonged monsoonal rain and flooding across northern Queensland (lower-confidence event detail; flag for review).
