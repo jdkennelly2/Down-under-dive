@@ -22,9 +22,9 @@ Passenger and booking analytics for a dive tourism operation. Key outputs are fo
 
 ## Airport Passenger Data
 - Source: BITRE monthly airport traffic data (WebMonthlyAirport xlsx files)
-- Current coverage in repo: **January 2009 – April 2026** (updated June 2026)
-- File: `Spreadsheets/airport_pax.csv` — monthly Cairns airport pax (dom/intl inbound/outbound)
-- Raw source extract: `Airport data/claude extract/cairns_airport_passengers.csv` (goes to Apr 2026)
+- Current coverage in repo: **January 2009 – December 2025** (BITRE source only)
+- File: `Spreadsheets/airport_pax.csv` — monthly Cairns airport pax (dom/intl inbound/outbound); BITRE data only, do not mix with Cairns Airport / economy.id source
+- Raw source extract: `Airport data/claude extract/cairns_airport_passengers.csv` (goes to Apr 2026, Cairns Airport source — use for reference/early indicator only, not for loading into models)
 - SQLite DB table `airport_pax` in `SQL/Paxday.db` — needs local update via `Spreadsheets/Airport import.py` when new BITRE xlsx is downloaded
 - `SQL/reef_airport_merged.csv` — quarterly reef+airport combined; airport columns current to Q4 2025; needs reef pax data for 2026 Q1+ before updating
 
