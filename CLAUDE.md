@@ -21,9 +21,12 @@ Passenger and booking analytics for a dive tourism operation. Key outputs are fo
 - Local .pbix files also on desktop
 
 ## Airport Passenger Data
-- Source: TBC (e.g. BITRE, OAG, airline data)
-- Current coverage: Confirm whether 2026 data has been loaded
-- As of June 2026: 2026 airport pax data status **unknown — needs verification**
+- Source: BITRE monthly airport traffic data (WebMonthlyAirport xlsx files)
+- Current coverage in repo: **January 2009 – April 2026** (updated June 2026)
+- File: `Spreadsheets/airport_pax.csv` — monthly Cairns airport pax (dom/intl inbound/outbound)
+- Raw source extract: `Airport data/claude extract/cairns_airport_passengers.csv` (goes to Apr 2026)
+- SQLite DB table `airport_pax` in `SQL/Paxday.db` — needs local update via `Spreadsheets/Airport import.py` when new BITRE xlsx is downloaded
+- `SQL/reef_airport_merged.csv` — quarterly reef+airport combined; airport columns current to Q4 2025; needs reef pax data for 2026 Q1+ before updating
 
 ## Common Tasks
 - Check whether a model has data for a given year/period
