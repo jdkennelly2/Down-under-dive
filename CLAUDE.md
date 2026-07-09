@@ -21,12 +21,14 @@ Passenger and booking analytics for a dive tourism operation. Key outputs are fo
 - Local .pbix files also on desktop
 
 ## Airport Passenger Data
-- Source: **BITRE** monthly "Airport traffic data" (top-twenty airports), CAIRNS rows only
+- Source: **BITRE** monthly "Airport traffic data" (top-twenty airports), CAIRNS rows only. **BITRE data ONLY — do NOT mix with Cairns Airport / economy.id sources in `airport_pax`.**
 - Download page: https://www.bitre.gov.au/publications/ongoing/airport_traffic_data
 - File naming (changed 2026): `aviation-airport_traffic_data-<month>_<year>.xlsx` (older: `WebMonthlyAirport<Month><Year>.xlsx`)
 - Loader: `Spreadsheets/import_airport.py` — auto-finds newest file in `Airport data/`, loads `airport_pax` table + refreshes `airport_pax.csv`
-- **Coverage as of July 2026: loaded through Feb 2026** (BITRE runs ~4 months in arrears; refresh monthly)
+- **Coverage as of July 2026: loaded through Feb 2026** (latest BITRE release; BITRE runs ~4 months in arrears; refresh monthly)
 - Note: BITRE back-revises recent months (e.g. Dec 2025 revised 201,302 → 193,358)
+- Reference-only extract: `Airport data/claude extract/cairns_airport_passengers.csv` (to ~Apr 2026, **Cairns Airport source** — early indicator only, NOT for loading into models)
+- `SQL/reef_airport_merged.csv` — quarterly reef+airport combined; airport columns current to Q4 2025; needs 2026 Q1+ reef pax data before updating
 
 ## Billy Tea Dashboard (BillyTea/ module)
 Separate product line (Billy Tea Safaris) — day tours to **Daintree Cape Tribulation**
@@ -67,6 +69,9 @@ reef/EMC/Down Under Dive pax — that's a separate model.
 - `SQL/reef_airport_correlation.py` and `Spreadsheets/Airport import.py` (old) hard-code
   `C:\Users\penny\Desktop\DA\Projects\...` or `...\Desktop\SQL\...` — **stale**. Canonical DB is
   `Down-under-dive\SQL\Paxday.db`. Power BI `.pbix` files live under `Desktop\DA\Projects\DOWN UNDER DIVE\POWER BI\`.
+
+## Workflow notes
+- **Multiple sessions/machines use this repo.** Always **Pull before starting** and **Push after committing** to avoid divergence (a prior split between the reef-airport session and the Billy Tea session required a manual merge).
 
 ## Common Tasks
 - Check whether a model has data for a given year/period
