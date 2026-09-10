@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "asOf": "2026-09-09",
+    "market": "ASX (Australian Securities Exchange)",
+    "criteria": {
+      "peMax": 10,
+      "cashFlowPositive": true,
+      "excludeSectors": ["Pharmaceuticals", "Biotechnology", "Mining exploration"]
+    },
+    "source": "Indicative figures blended from public sources (GuruFocus, StockAnalysis, Simply Wall St, Stockopedia, company results) as researched on 2026-09-09. P/E varies by methodology (trailing vs forward). Not live — regenerate with screener.py for current data.",
+    "disclaimer": "General information only, not financial or investment advice. Figures are indicative and may be stale or revised. Verify against a live source and consider your own circumstances before making any decision."
+  },
+  "stocks": [
+    {"ticker": "ALD", "name": "Ampol", "sector": "Energy", "industry": "Fuel refining & marketing", "pe": 6.8, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Downstream fuels; strong operating cash generation."},
+    {"ticker": "GQG", "name": "GQG Partners", "sector": "Financials", "industry": "Asset management", "pe": 7.2, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Capital-light funds manager; high cash conversion."},
+    {"ticker": "DXS", "name": "Dexus", "sector": "Real Estate", "industry": "Diversified REIT", "pe": 7.3, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Free-cash-flow yield ~10%. P/E on a discounted REIT."},
+    {"ticker": "GNC", "name": "GrainCorp", "sector": "Consumer Staples", "industry": "Agribusiness", "pe": 8.0, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Grain handling & processing; earnings are seasonal/cyclical."},
+    {"ticker": "YAL", "name": "Yancoal Australia", "sector": "Energy", "industry": "Coal — producer", "pe": 8.0, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Producing thermal/met coal miner (not explorer). Commodity-price sensitive."},
+    {"ticker": "GPT", "name": "GPT Group", "sector": "Real Estate", "industry": "Diversified REIT", "pe": 8.3, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Office/retail/logistics REIT trading below NTA."},
+    {"ticker": "RGN", "name": "Region Group", "sector": "Real Estate", "industry": "Retail REIT", "pe": 8.8, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Convenience/neighbourhood retail landlord; steady rents."},
+    {"ticker": "WHC", "name": "Whitehaven Coal", "sector": "Energy", "industry": "Coal — producer", "pe": 9.5, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Producing coal miner (not explorer). Highly cyclical earnings."},
+    {"ticker": "RRL", "name": "Regis Resources", "sector": "Materials", "industry": "Gold — producer", "pe": 9.9, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Producing gold miner (not explorer). Leveraged to gold price."},
+    {"ticker": "QAN", "name": "Qantas Airways", "sector": "Industrials", "industry": "Airline", "pe": 9.9, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Strong operating cash flow, but free cash flow swings with fleet capex — check latest."},
+
+    {"ticker": "HVN", "name": "Harvey Norman", "sector": "Consumer Discretionary", "industry": "Retail", "pe": 10.4, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Just above the P/E<10 line on trailing earnings; passes if you widen the threshold."},
+    {"ticker": "SGP", "name": "Stockland", "sector": "Real Estate", "industry": "Diversified REIT", "pe": 10.9, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Residential/retail REIT; narrowly above the P/E cutoff."},
+    {"ticker": "FMG", "name": "Fortescue", "sector": "Materials", "industry": "Iron ore — producer", "pe": 11.0, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Major iron-ore producer; above the P/E cutoff at present."},
+    {"ticker": "STO", "name": "Santos", "sector": "Energy", "industry": "Oil & gas", "pe": 21.4, "cashFlowPositive": true, "isPharma": false, "isMiningExploration": false, "note": "Trailing P/E well above 10 (forward ~12); fails the earnings-multiple test."},
+    {"ticker": "CRN", "name": "Coronado Global Resources", "sector": "Energy", "industry": "Coal — producer", "pe": null, "cashFlowPositive": false, "isPharma": false, "isMiningExploration": false, "note": "Loss-making — no meaningful P/E; fails cash-flow/earnings screen."},
+    {"ticker": "CSL", "name": "CSL", "sector": "Health Care", "industry": "Biotechnology / pharmaceuticals", "pe": 27.0, "cashFlowPositive": true, "isPharma": true, "isMiningExploration": false, "note": "Excluded by rule: pharmaceutical / biotech sector."},
+    {"ticker": "CHN", "name": "Chalice Mining", "sector": "Materials", "industry": "Mineral exploration", "pe": null, "cashFlowPositive": false, "isPharma": false, "isMiningExploration": true, "note": "Excluded by rule: pre-revenue mining explorer (no earnings)."}
+  ]
+}

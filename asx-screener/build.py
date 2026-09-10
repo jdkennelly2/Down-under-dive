@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 """
-Wrap app.html (the shared UI, also used as the Claude Artifact) into
-index.html — a standalone, installable PWA with the iOS home-screen
-metadata Safari needs. Run after editing app.html:
+Build the deployable site into ../docs/ — the folder GitHub Pages serves.
+
+Wraps app.html (the shared UI, also used as the Claude Artifact) into
+index.html, a standalone installable PWA carrying the iOS home-screen
+metadata Safari needs, then copies the runtime assets alongside it.
+
+Only the screener is emitted, so the published site exposes nothing else
+from this repo. Run after editing app.html or refreshing data.json:
 
     python build.py
 """
+import shutil
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+OUT = HERE.parent / "docs"
 src = (HERE / "app.html").read_text()
 
 # app.html holds <title>/<style>/<link> first, then the page body.
@@ -74,5 +81,17 @@ SW = """
 </html>
 """
 
-(HERE / "index.html").write_text(HEAD + head_src.strip() + RESET_AND_IOS + body_src.rstrip() + SW)
-print("wrote index.html")
+OUT.mkdir(exist_ok=True)
+(OUT / "index.html").write_text(HEAD + head_src.strip() + RESET_AND_IOS + body_src.rstrip() + SW)
+
+# Serve the files as-is (no Jekyll processing).
+(OUT / ".nojekyll").write_text("")
+
+ASSETS = ["data.json", "manifest.webmanifest", "sw.js", "apple-touch-icon.png",
+          "icon-192.png", "icon-512.png", "icon-1024.png"]
+for a in ASSETS:
+    shutil.copy2(HERE / a, OUT / a)
+
+print(f"built {OUT}/")
+for f in sorted(OUT.iterdir()):
+    print("  ", f.name)
