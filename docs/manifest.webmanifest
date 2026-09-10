@@ -1,0 +1,41 @@
+{
+  "name": "Deep Value ASX",
+  "short_name": "Deep Value",
+  "description": "Screen ASX shares for a P/E under 10, positive cash flow, and no pharma or mining explorers.",
+  "start_url": "/Down-under-dive/",
+  "scope": "/Down-under-dive/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "background_color": "#0d5c68",
+  "theme_color": "#0d5c68",
+  "categories": [
+    "finance",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

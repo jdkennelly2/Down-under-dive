@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Screen ASX shares for a P/E under 10, positive cash flow, and no pharma or mining explorers.">
+
+<!-- Home-screen app (iOS + Android) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Deep Value">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#eef0f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0f15" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<title>Deep Value ASX</title>
+<style>
+  :root{
+    --ground:#eef0f4;
+    --surface:#ffffff;
+    --surface-2:#f7f8fb;
+    --ink:#111722;
+    --muted:#5c6675;
+    --hair:#e2e5ec;
+    --hair-strong:#cdd2dd;
+    --accent:#0f7c8a;
+    --accent-ink:#0a5d68;
+    --pass:#1f8a5b;
+    --pass-bg:#e5f3ec;
+    --warn:#b07d1e;
+    --warn-bg:#f6eddb;
+    --fail:#b23f3a;
+    --fail-bg:#f6e4e2;
+    --shadow:0 1px 2px rgba(17,23,34,.06),0 8px 24px rgba(17,23,34,.06);
+    --font-display:"Fraunces",Georgia,serif;
+    --font-ui:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  :root:not([data-theme="light"]){
+    @media (prefers-color-scheme: dark){
+      --ground:#0b0f15;
+      --surface:#141b24;
+      --surface-2:#0f151d;
+      --ink:#e9eef5;
+      --muted:#8c98a8;
+      --hair:#232c38;
+      --hair-strong:#33404f;
+      --accent:#39aab6;
+      --accent-ink:#7fd3db;
+      --pass:#48c48c;
+      --pass-bg:#123026;
+      --warn:#d6a544;
+      --warn-bg:#33280f;
+      --fail:#e0716b;
+      --fail-bg:#361c1a;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0b0f15;
+    --surface:#141b24;
+    --surface-2:#0f151d;
+    --ink:#e9eef5;
+    --muted:#8c98a8;
+    --hair:#232c38;
+    --hair-strong:#33404f;
+    --accent:#39aab6;
+    --accent-ink:#7fd3db;
+    --pass:#48c48c;
+    --pass-bg:#123026;
+    --warn:#d6a544;
+    --warn-bg:#33280f;
+    --fail:#e0716b;
+    --fail-bg:#361c1a;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:var(--font-ui);
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:0 16px 64px;}
+
+  /* ---- Mode strip (says whether iOS launched this as an app) ---- */
+  .modebar{
+    font-family:var(--font-mono);font-size:11px;font-weight:600;
+    letter-spacing:.08em;text-transform:uppercase;text-align:center;
+    padding:9px 12px;border-radius:9px;margin:12px 0 0;
+  }
+  .modebar.installed{background:var(--pass-bg);color:var(--pass);}
+  .modebar.browser{background:var(--warn-bg);color:var(--warn);}
+
+  /* ---- Masthead ---- */
+  header{padding:26px 0 18px;}
+  .kicker{
+    font-family:var(--font-mono);
+    font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--accent-ink);margin:0 0 6px;
+  }
+  h1{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:clamp(30px,9vw,42px);
+    line-height:1.02;letter-spacing:-.01em;margin:0;
+    text-wrap:balance;
+  }
+  h1 em{font-style:italic;color:var(--accent);}
+  .sub{color:var(--muted);font-size:14px;margin:10px 0 0;max-width:44ch;}
+
+  .stamp{
+    display:flex;gap:14px;flex-wrap:wrap;align-items:baseline;
+    margin-top:16px;padding-top:14px;border-top:1px solid var(--hair);
+    font-family:var(--font-mono);font-size:12px;color:var(--muted);
+  }
+  .stamp b{color:var(--ink);font-weight:600;}
+  .stamp .dot{color:var(--hair-strong);}
+
+  /* ---- Criteria / controls ---- */
+  .panel{
+    background:var(--surface);border:1px solid var(--hair);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px;margin-top:18px;
+  }
+  .panel .subhead{margin:18px 0 4px;padding-top:14px;border-top:1px solid var(--hair);}
+  .panel h2{
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--muted);margin:0 0 14px;font-weight:600;
+  }
+  .ctl{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;}
+  .ctl + .ctl{border-top:1px dashed var(--hair);}
+  .ctl label{font-size:14px;font-weight:500;}
+  .ctl .hint{display:block;font-size:12px;color:var(--muted);font-weight:400;margin-top:1px;}
+
+  .pe-val{
+    font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+    font-size:15px;font-weight:600;color:var(--accent-ink);
+    background:var(--surface-2);border:1px solid var(--hair);border-radius:8px;
+    padding:2px 8px;min-width:64px;text-align:center;
+  }
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:4px;margin:14px 0 2px;
+    background:var(--hair-strong);border-radius:99px;outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;
+    background:var(--accent);border:3px solid var(--surface);box-shadow:var(--shadow);cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:22px;height:22px;border-radius:50%;background:var(--accent);
+    border:3px solid var(--surface);cursor:pointer;
+  }
+  input[type=range]:focus-visible{box-shadow:0 0 0 3px var(--accent-ink);}
+
+  /* toggle switch */
+  .switch{position:relative;flex:0 0 auto;width:44px;height:26px;}
+  .switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;}
+  .track{
+    position:absolute;inset:0;border-radius:99px;background:var(--hair-strong);
+    transition:background .18s ease;
+  }
+  .track::after{
+    content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .18s ease;
+  }
+  .switch input:checked + .track{background:var(--accent);}
+  .switch input:checked + .track::after{transform:translateX(18px);}
+  .switch input:focus-visible + .track{box-shadow:0 0 0 3px var(--accent-ink);}
+
+  /* ---- Results ---- */
+  .results-head{
+    display:flex;align-items:baseline;justify-content:space-between;
+    margin:26px 2px 12px;
+  }
+  .results-head h2{font-family:var(--font-display);font-size:20px;font-weight:600;margin:0;}
+  .count{font-family:var(--font-mono);font-size:12px;color:var(--muted);}
+  .count b{color:var(--pass);}
+
+  ol.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;}
+  .card{
+    background:var(--surface);border:1px solid var(--hair);border-radius:14px;
+    box-shadow:var(--shadow);padding:14px 14px 13px;
+    display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;
+    column-gap:12px;row-gap:8px;align-items:center;
+  }
+  .rank{
+    grid-row:1/2;font-family:var(--font-mono);font-size:12px;font-weight:600;
+    color:var(--surface);background:var(--accent);border-radius:7px;
+    width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+    font-variant-numeric:tabular-nums;
+  }
+  .ident{grid-column:2/3;grid-row:1/2;min-width:0;}
+  .ticker{font-family:var(--font-mono);font-weight:600;font-size:16px;letter-spacing:.02em;}
+  .ticker span{color:var(--muted);font-weight:400;font-size:12px;}
+  .name{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pe{
+    grid-column:3/4;grid-row:1/2;text-align:right;
+  }
+  .pe b{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:22px;font-weight:600;letter-spacing:-.02em;}
+  .pe small{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:-2px;}
+
+  .meta{grid-column:1/4;grid-row:2/2;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .chip{
+    font-size:11px;font-weight:500;padding:3px 8px;border-radius:99px;
+    border:1px solid var(--hair-strong);color:var(--muted);white-space:nowrap;
+  }
+  .chip.sector{background:var(--surface-2);}
+  .chip.cf{color:var(--pass);background:var(--pass-bg);border-color:transparent;}
+  .chip.cf::before{content:"▲ ";font-size:9px;}
+  .cardnote{grid-column:1/4;font-size:12px;color:var(--muted);line-height:1.4;}
+
+  /* dividend context — secondary to the screen, not a filter */
+  .divs{
+    grid-column:1/4;display:flex;gap:18px;align-items:baseline;
+    padding-top:9px;border-top:1px dashed var(--hair);
+  }
+  .divs div{display:flex;flex-direction:column;gap:1px;}
+  .divs dt{
+    font-family:var(--font-mono);font-size:9px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--muted);
+  }
+  .divs dd{
+    margin:0;font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+    font-size:14px;font-weight:600;color:var(--ink);
+  }
+  .divs dd.none{color:var(--muted);font-weight:400;}
+  .divs dd.strain{color:var(--warn);}
+  .divs dd.strain::after{content:" \26A0";font-size:10px;}
+
+  .empty{
+    text-align:center;color:var(--muted);font-size:14px;
+    padding:34px 16px;border:1px dashed var(--hair-strong);border-radius:14px;
+  }
+
+  /* excluded / near-miss reveal */
+  details.excluded{margin-top:22px;}
+  details.excluded summary{
+    cursor:pointer;font-family:var(--font-mono);font-size:12px;letter-spacing:.06em;
+    color:var(--muted);padding:10px 0;list-style:none;
+  }
+  details.excluded summary::-webkit-details-marker{display:none;}
+  details.excluded summary::before{content:"▸ ";color:var(--accent);}
+  details.excluded[open] summary::before{content:"▾ ";}
+  .ex-row{
+    display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--hair);
+    font-size:13px;
+  }
+  .ex-row .t{font-family:var(--font-mono);font-weight:600;min-width:44px;}
+  .ex-row .why{color:var(--muted);font-size:12px;margin-left:auto;text-align:right;}
+  .tag-fail{color:var(--fail);}
+  .tag-warn{color:var(--warn);}
+
+  footer{
+    margin-top:30px;padding-top:16px;border-top:1px solid var(--hair);
+    font-size:12px;color:var(--muted);line-height:1.5;
+  }
+  footer .warn{
+    display:block;background:var(--warn-bg);color:var(--warn);
+    border-radius:10px;padding:10px 12px;margin-bottom:12px;font-weight:500;
+  }
+  footer a{color:var(--accent-ink);}
+  footer .mode{
+    margin:14px 0 0;padding-top:12px;border-top:1px solid var(--hair);
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.03em;color:var(--muted);
+  }
+  footer .mode b{color:var(--pass);}
+  footer .mode i{color:var(--warn);font-style:normal;}
+  @media (prefers-reduced-motion: reduce){*{transition:none !important;}}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* base reset (the Artifact host supplies this; a standalone page needs its own) */
+  :root{color-scheme:light dark}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+
+  /* Installed-app chrome: keep content clear of the notch / home indicator,
+     and stop the rubber-band scroll showing a mismatched ground. */
+  body{
+    background:var(--ground);
+    min-height:100svh;
+    padding-left:env(safe-area-inset-left);
+    padding-right:env(safe-area-inset-right);
+  }
+  .wrap{
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:calc(env(safe-area-inset-bottom) + 48px);
+  }
+  /* No text selection flicker or tap highlight when used as an app */
+  .switch,.rank,input[type=range],summary{-webkit-tap-highlight-color:transparent}
+  .switch,.rank,summary{-webkit-user-select:none;user-select:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="modebar" id="modebar"></div>
+
+  <header>
+    <p class="kicker">ASX Value Screen</p>
+    <h1>Deep&nbsp;Value <em>Down&nbsp;Under</em></h1>
+    <p class="sub">Australian shares on a low earnings multiple with positive cash flow — pharma, mining, energy, property trusts and fund managers screened out.</p>
+    <div class="stamp">
+      <span>As of <b id="asOf">—</b></span><span class="dot">/</span>
+      <span><b id="universeN">—</b> in universe</span><span class="dot">/</span>
+      <span><b id="matchN">—</b> pass</span>
+    </div>
+  </header>
+
+  <section class="panel" aria-label="Screening criteria">
+    <h2>Criteria</h2>
+    <div class="ctl">
+      <label for="pe">Max P/E ratio<span class="hint">Trailing price ÷ earnings</span></label>
+      <output class="pe-val" id="peOut">&lt; 10.0</output>
+    </div>
+    <input id="pe" type="range" min="4" max="20" step="0.5" value="10" aria-label="Maximum P/E ratio">
+    <div class="ctl">
+      <label for="cf">Cash-flow positive<span class="hint">Generates cash, not just accounting profit</span></label>
+      <span class="switch"><input id="cf" type="checkbox" checked><span class="track"></span></span>
+    </div>
+    <h2 class="subhead">Exclude</h2>
+    <div class="ctl">
+      <label for="ph">Pharma &amp; biotech<span class="hint">Drug developers</span></label>
+      <span class="switch"><input id="ph" type="checkbox" checked><span class="track"></span></span>
+    </div>
+    <div class="ctl">
+      <label for="rt">REITs<span class="hint">Property trusts — revaluations distort earnings</span></label>
+      <span class="switch"><input id="rt" type="checkbox" checked><span class="track"></span></span>
+    </div>
+    <div class="ctl">
+      <label for="fm">Fund managers<span class="hint">Asset managers only, not financials broadly</span></label>
+      <span class="switch"><input id="fm" type="checkbox" checked><span class="track"></span></span>
+    </div>
+    <div class="ctl">
+      <label for="mx">Mining &amp; energy<span class="hint">Commodities, producers and explorers</span></label>
+      <span class="switch"><input id="mx" type="checkbox" checked><span class="track"></span></span>
+    </div>
+  </section>
+
+  <div class="results-head">
+    <h2 id="resultsTitle">The First Ten</h2>
+    <span class="count"><b id="passCount">0</b> pass · showing top <span id="showN">10</span></span>
+  </div>
+
+  <ol class="list" id="list"></ol>
+
+  <details class="excluded" id="exWrap">
+    <summary>Why others didn’t make the cut</summary>
+    <div id="exList"></div>
+  </details>
+
+  <footer>
+    <span class="warn">General information only — not financial advice. Figures are indicative and change daily; verify against a live source before acting.</span>
+    <span id="srcNote"></span>
+    <p style="margin:10px 0 0">Data blended from public sources on the “as of” date. To pull fresh figures, run <code style="font-family:var(--font-mono)">screener.py</code> (see the project README) — it queries live market data and rewrites this list.</p>
+    <p class="mode" id="mode"></p>
+  </footer>
+</div>
+
+<script>
+  // Fallback dataset (mirrors data.json). When served over http(s), the app
+  // fetches ./data.json and uses that instead, so re-running screener.py updates the app.
+  const SEED = {
+  "meta": {
+    "asOf": "2026-09-10",
+    "source": "Indicative figures blended from public sources (GuruFocus, StockAnalysis, Simply Wall St, Stockopedia, Kalkine, company results) as researched on 2026-09-10. P/E, yield and payout vary by source and methodology (trailing vs forward, and whether special dividends are counted). Not live — regenerate with screener.py for current data."
+  },
+  "stocks": [
+    {
+      "ticker": "HLI",
+      "name": "Helia Group",
+      "sector": "Financials",
+      "industry": "Mortgage insurance",
+      "pe": 6.64,
+      "dividendYield": 6.07,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Lenders mortgage insurer — an underwriter, not a funds manager. Headline yields near 22% appear when special dividends are counted; ordinary yield is ~6%. New business is shrinking."
+    },
+    {
+      "ticker": "GNC",
+      "name": "GrainCorp",
+      "sector": "Consumer Staples",
+      "industry": "Agribusiness",
+      "pe": 8.03,
+      "dividendYield": 7.24,
+      "payoutRatio": 154.39,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Grain handling and processing. Earnings swing with the harvest, and the payout currently exceeds earnings."
+    },
+    {
+      "ticker": "ASG",
+      "name": "Autosports Group",
+      "sector": "Consumer Discretionary",
+      "industry": "Auto retail",
+      "pe": 8.44,
+      "dividendYield": 2.7,
+      "payoutRatio": 44.0,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Prestige and luxury car dealerships. Forward P/E ~7.1; payout covered by earnings (44%) though cash payout is tighter at 86%."
+    },
+    {
+      "ticker": "MTO",
+      "name": "MotorCycle Holdings",
+      "sector": "Consumer Discretionary",
+      "industry": "Auto retail",
+      "pe": 8.54,
+      "dividendYield": 5.4,
+      "payoutRatio": 54.0,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Motorcycle dealerships and parts. Payout well covered on both earnings (54%) and cash (22%); EPS forecast to grow."
+    },
+    {
+      "ticker": "QAN",
+      "name": "Qantas Airways",
+      "sector": "Industrials",
+      "industry": "Airline",
+      "pe": 9.9,
+      "dividendYield": 5.4,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Strong operating cash flow, but free cash flow swings with fleet capex. Dividend resumed recently, fully franked."
+    },
+    {
+      "ticker": "HVN",
+      "name": "Harvey Norman",
+      "sector": "Consumer Discretionary",
+      "industry": "Retail",
+      "pe": 10.4,
+      "dividendYield": 6.1,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Just above the P/E<10 line on trailing earnings. Appears if you nudge the ceiling to 11."
+    },
+    {
+      "ticker": "PWR",
+      "name": "Peter Warren Automotive",
+      "sector": "Consumer Discretionary",
+      "industry": "Auto retail",
+      "pe": 10.48,
+      "dividendYield": null,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Another dealership group just over the line; earnings estimates have been cut recently."
+    },
+    {
+      "ticker": "MMS",
+      "name": "McMillan Shakespeare",
+      "sector": "Financials",
+      "industry": "Salary packaging & leasing",
+      "pe": 11.4,
+      "dividendYield": 6.66,
+      "payoutRatio": 75.0,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Novated leasing and salary packaging — a financial services business, not a funds manager. Above the P/E cutoff."
+    },
+    {
+      "ticker": "ACU",
+      "name": "Acumentis Group",
+      "sector": "Real Estate",
+      "industry": "Property valuation & advisory",
+      "pe": 14.42,
+      "dividendYield": 2.62,
+      "payoutRatio": 34.0,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "A valuation and advisory services business, NOT a property trust — so it clears the REIT filter as intended. Fails only on P/E at 14.4; payout is comfortable at 34% of earnings. Appears if the ceiling goes to 15."
+    },
+    {
+      "ticker": "SWM",
+      "name": "Seven West Media",
+      "sector": "Communication Services",
+      "industry": "Broadcasting",
+      "pe": 11.57,
+      "dividendYield": 0.0,
+      "payoutRatio": 0.0,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Above the cutoff and pays no dividend at present."
+    },
+    {
+      "ticker": "APE",
+      "name": "Eagers Automotive",
+      "sector": "Consumer Discretionary",
+      "industry": "Auto retail",
+      "pe": 18.33,
+      "dividendYield": 4.9,
+      "payoutRatio": 85.0,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Re-rated well above the cutoff; payout supported by cash flows."
+    },
+    {
+      "ticker": "GQG",
+      "name": "GQG Partners",
+      "sector": "Financials",
+      "industry": "Asset management",
+      "pe": 7.22,
+      "dividendYield": 14.4,
+      "payoutRatio": 94.05,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": true,
+      "note": "Excluded by rule: fund manager. Would rank near the top on P/E."
+    },
+    {
+      "ticker": "CQR",
+      "name": "Charter Hall Retail REIT",
+      "sector": "Real Estate",
+      "industry": "Retail REIT",
+      "pe": 6.15,
+      "dividendYield": 8.54,
+      "payoutRatio": 52.0,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": true,
+      "isFundManager": false,
+      "note": "Excluded by rule: REIT. Cheapest name in the universe on earnings-based P/E."
+    },
+    {
+      "ticker": "HDN",
+      "name": "HomeCo Daily Needs REIT",
+      "sector": "Real Estate",
+      "industry": "Retail REIT",
+      "pe": 6.76,
+      "dividendYield": 6.94,
+      "payoutRatio": 212.5,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": true,
+      "isFundManager": false,
+      "note": "Excluded by rule: REIT. Payout of 213% shows why REIT earnings are a poor denominator."
+    },
+    {
+      "ticker": "DXS",
+      "name": "Dexus",
+      "sector": "Real Estate",
+      "industry": "Diversified REIT",
+      "pe": 7.3,
+      "dividendYield": 5.44,
+      "payoutRatio": 57.74,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": true,
+      "isFundManager": true,
+      "note": "Excluded by rule: REIT and funds manager — Dexus is both."
+    },
+    {
+      "ticker": "WPR",
+      "name": "Waypoint REIT",
+      "sector": "Real Estate",
+      "industry": "Net-lease REIT",
+      "pe": 7.98,
+      "dividendYield": 6.84,
+      "payoutRatio": 85.7,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": true,
+      "isFundManager": false,
+      "note": "Excluded by rule: REIT."
+    },
+    {
+      "ticker": "GPT",
+      "name": "GPT Group",
+      "sector": "Real Estate",
+      "industry": "Diversified REIT",
+      "pe": 8.33,
+      "dividendYield": 5.21,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": true,
+      "isFundManager": false,
+      "note": "Excluded by rule: REIT."
+    },
+    {
+      "ticker": "RGN",
+      "name": "Region Group",
+      "sector": "Real Estate",
+      "industry": "Retail REIT",
+      "pe": 8.79,
+      "dividendYield": 6.35,
+      "payoutRatio": 86.64,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": true,
+      "isFundManager": false,
+      "note": "Excluded by rule: REIT."
+    },
+    {
+      "ticker": "SGP",
+      "name": "Stockland",
+      "sector": "Real Estate",
+      "industry": "Diversified REIT",
+      "pe": 10.85,
+      "dividendYield": 4.9,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": true,
+      "isFundManager": false,
+      "note": "Excluded by rule: REIT. Also above the P/E cutoff."
+    },
+    {
+      "ticker": "GOZ",
+      "name": "Growthpoint Properties",
+      "sector": "Real Estate",
+      "industry": "Office REIT",
+      "pe": 43.2,
+      "dividendYield": 8.48,
+      "payoutRatio": 78.2,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": true,
+      "isFundManager": false,
+      "note": "Excluded by rule: REIT. Also far above the P/E cutoff."
+    },
+    {
+      "ticker": "ALD",
+      "name": "Ampol",
+      "sector": "Energy",
+      "industry": "Fuel refining & marketing",
+      "pe": 6.8,
+      "dividendYield": 7.3,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Excluded by rule: energy."
+    },
+    {
+      "ticker": "YAL",
+      "name": "Yancoal Australia",
+      "sector": "Energy",
+      "industry": "Coal — producer",
+      "pe": 8.0,
+      "dividendYield": 10.5,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Excluded by rule: mining & energy."
+    },
+    {
+      "ticker": "WHC",
+      "name": "Whitehaven Coal",
+      "sector": "Energy",
+      "industry": "Coal — producer",
+      "pe": 9.46,
+      "dividendYield": 3.6,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Excluded by rule: mining & energy."
+    },
+    {
+      "ticker": "RRL",
+      "name": "Regis Resources",
+      "sector": "Materials",
+      "industry": "Gold — producer",
+      "pe": 9.89,
+      "dividendYield": 1.2,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Excluded by rule: mining & commodities."
+    },
+    {
+      "ticker": "FMG",
+      "name": "Fortescue",
+      "sector": "Materials",
+      "industry": "Iron ore — producer",
+      "pe": 11.02,
+      "dividendYield": 8.9,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Excluded by rule: mining & commodities."
+    },
+    {
+      "ticker": "STO",
+      "name": "Santos",
+      "sector": "Energy",
+      "industry": "Oil & gas",
+      "pe": 21.39,
+      "dividendYield": 3.1,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Excluded by rule: energy."
+    },
+    {
+      "ticker": "CRN",
+      "name": "Coronado Global Resources",
+      "sector": "Energy",
+      "industry": "Coal — producer",
+      "pe": null,
+      "dividendYield": 0.0,
+      "payoutRatio": null,
+      "cashFlowPositive": false,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Excluded by rule: mining & energy. Also loss-making."
+    },
+    {
+      "ticker": "CSL",
+      "name": "CSL",
+      "sector": "Health Care",
+      "industry": "Biotechnology / pharmaceuticals",
+      "pe": 27.0,
+      "dividendYield": 1.6,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": true,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Excluded by rule: pharmaceutical / biotech."
+    },
+    {
+      "ticker": "CHN",
+      "name": "Chalice Mining",
+      "sector": "Materials",
+      "industry": "Mineral exploration",
+      "pe": null,
+      "dividendYield": 0.0,
+      "payoutRatio": null,
+      "cashFlowPositive": false,
+      "isPharma": false,
+      "isMiningExploration": true,
+      "isResourcesEnergy": true,
+      "isREIT": false,
+      "isFundManager": false,
+      "note": "Excluded by rule: pre-revenue mining explorer."
+    }
+  ]
+};
+
+  const $ = s => document.querySelector(s);
+  const listEl = $("#list"), exListEl = $("#exList"), exWrap = $("#exWrap");
+  const peIn = $("#pe"), cfIn = $("#cf"), phIn = $("#ph"), mxIn = $("#mx"),
+        rtIn = $("#rt"), fmIn = $("#fm");
+  let DATA = SEED;
+
+  function classify(s, opts){
+    if(s.isPharma && opts.ph) return {pass:false, sev:"fail", why:"Pharma / biotech"};
+    if(opts.rt && s.isREIT) return {pass:false, sev:"fail", why:"REIT"};
+    if(opts.fm && s.isFundManager) return {pass:false, sev:"fail", why:"Fund manager"};
+    if(opts.mx && (s.isResourcesEnergy || s.isMiningExploration))
+      return {pass:false, sev:"fail",
+              why: s.isMiningExploration ? "Mining exploration" : "Mining / energy"};
+    if(opts.cf && !s.cashFlowPositive) return {pass:false, sev:"fail", why:"Not cash-flow positive"};
+    if(s.pe === null) return {pass:false, sev:"fail", why:"No earnings (P/E n/a)"};
+    if(s.pe >= opts.pe){
+      const sev = s.pe < opts.pe + 1.5 ? "warn" : "fail";
+      return {pass:false, sev, why:"P/E " + s.pe.toFixed(1)};
+    }
+    return {pass:true};
+  }
+
+  function render(){
+    const opts = {pe:parseFloat(peIn.value), cf:cfIn.checked, ph:phIn.checked,
+                  mx:mxIn.checked, rt:rtIn.checked, fm:fmIn.checked};
+    $("#peOut").textContent = "< " + opts.pe.toFixed(1);
+
+    const stocks = DATA.stocks.map(s => ({s, r:classify(s, opts)}));
+    const passes = stocks.filter(x => x.r.pass).sort((a,b)=>a.s.pe-b.s.pe);
+    const fails  = stocks.filter(x => !x.r.pass)
+                         .sort((a,b)=>(a.s.pe??999)-(b.s.pe??999));
+    const shown = passes.slice(0,10);
+
+    $("#matchN").textContent = passes.length;
+    $("#passCount").textContent = passes.length;
+    $("#showN").textContent = Math.min(10, passes.length) || 0;
+    $("#resultsTitle").textContent = passes.length >= 10 ? "The First Ten"
+      : passes.length ? "The Matches" : "No Matches";
+
+    listEl.innerHTML = "";
+    if(!shown.length){
+      const li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = "Nothing clears these filters. Loosen the P/E ceiling or a toggle above.";
+      listEl.append(li);
+    }
+    shown.forEach((x,i) => listEl.append(card(x.s, i+1)));
+
+    exListEl.innerHTML = "";
+    fails.forEach(x => exListEl.append(exRow(x.s, x.r)));
+    exWrap.style.display = fails.length ? "" : "none";
+  }
+
+  function card(s, rank){
+    const li = document.createElement("li");
+    li.className = "card";
+    li.innerHTML =
+      `<span class="rank">${rank}</span>
+       <div class="ident">
+         <div class="ticker">${s.ticker} <span>ASX</span></div>
+         <div class="name">${s.name}</div>
+       </div>
+       <div class="pe"><b>${s.pe.toFixed(1)}</b><small>P/E</small></div>
+       <div class="meta">
+         <span class="chip sector">${s.sector}</span>
+         <span class="chip">${s.industry}</span>
+         <span class="chip cf">Cash-flow positive</span>
+       </div>
+       <div class="cardnote">${s.note}</div>
+       <dl class="divs">
+         <div><dt>Div yield</dt>${stat(s.dividendYield, "%")}</div>
+         <div><dt>Payout</dt>${stat(s.payoutRatio, "%", 100)}</div>
+       </dl>`;
+    return li;
+  }
+
+  // Renders a figure, or an em dash when the source did not report one —
+  // never a guess. strainAbove marks a value that signals trouble.
+  function stat(v, unit, strainAbove){
+    if(v === null || v === undefined) return '<dd class="none">\u2014</dd>';
+    const strained = strainAbove !== undefined && v > strainAbove;
+    return `<dd class="${strained ? "strain" : ""}">${v.toFixed(1)}${unit}</dd>`;
+  }
+
+  function exRow(s, r){
+    const div = document.createElement("div");
+    div.className = "ex-row";
+    div.innerHTML =
+      `<span class="t">${s.ticker}</span>
+       <span style="color:var(--muted)">${s.name}</span>
+       <span class="why tag-${r.sev}">${r.why}</span>`;
+    return div;
+  }
+
+  [peIn,cfIn,phIn,mxIn,rtIn,fmIn].forEach(el => el.addEventListener("input", render));
+
+  const BUILD = "2026-09-10.10";
+
+  function reportMode(){
+    const installed = matchMedia("(display-mode: standalone)").matches
+                   || matchMedia("(display-mode: fullscreen)").matches
+                   || navigator.standalone === true;
+    const bar = $("#modebar");
+    if (bar){
+      // In a browser this is a useful nudge to install; inside the installed
+      // app it would only state the obvious, so it is hidden there. The footer
+      // keeps the mode and build for diagnostics either way.
+      bar.hidden = installed;
+      bar.className = "modebar browser";
+      bar.textContent = `In browser — not installed · build ${BUILD} · Share ▸ Add to Home Screen`;
+    }
+    const el = $("#mode");
+    if (!el) return;
+    el.innerHTML = installed
+      ? `<b>✓ Running as an installed app</b> · build ${BUILD}`
+      : `<i>Running in the browser</i> · build ${BUILD} · Share ▸ Add to Home Screen to install`;
+  }
+
+  function boot(){
+    reportMode();
+    $("#asOf").textContent = DATA.meta.asOf;
+    $("#universeN").textContent = DATA.stocks.length;
+    $("#srcNote").textContent = DATA.meta.source;
+    render();
+  }
+
+  // Prefer live data.json when the page is served (not opened as a file / inlined artifact).
+  if(location.protocol.startsWith("http")){
+    fetch("data.json").then(r => r.ok ? r.json() : Promise.reject())
+      .then(j => { DATA = j; })
+      .catch(()=>{})
+      .finally(boot);
+  } else {
+    boot();
+  }
+</script>
+<script>
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
+  }
+</script>
+</body>
+</html>
