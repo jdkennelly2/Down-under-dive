@@ -443,7 +443,7 @@
 
   [peIn,cfIn,phIn,mxIn].forEach(el => el.addEventListener("input", render));
 
-  const BUILD = "2026-09-10.6";
+  const BUILD = "2026-09-10.7";
 
   function reportMode(){
     const installed = matchMedia("(display-mode: standalone)").matches
@@ -451,10 +451,12 @@
                    || navigator.standalone === true;
     const bar = $("#modebar");
     if (bar){
-      bar.className = "modebar " + (installed ? "installed" : "browser");
-      bar.textContent = installed
-        ? `✓ Installed app · build ${BUILD}`
-        : `In browser — not installed · build ${BUILD}`;
+      // In a browser this is a useful nudge to install; inside the installed
+      // app it would only state the obvious, so it is hidden there. The footer
+      // keeps the mode and build for diagnostics either way.
+      bar.hidden = installed;
+      bar.className = "modebar browser";
+      bar.textContent = `In browser — not installed · build ${BUILD} · Share ▸ Add to Home Screen`;
     }
     const el = $("#mode");
     if (!el) return;

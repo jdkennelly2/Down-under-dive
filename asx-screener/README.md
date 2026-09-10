@@ -84,9 +84,20 @@ Only `docs/` is served. The pax spreadsheets, PDFs, `SQL/`, `BillyTea/` and
 **2. Add it to the home screen**
 
 Open that URL in **Safari** on the iPhone — it must be Safari, as Chrome cannot
-install web apps on iOS — then **Share ▸ Add to Home Screen ▸ Add**. You get a
-"P/E <10" icon named **Deep Value** that launches full-screen, with no browser
-chrome, and keeps working offline.
+install web apps on iOS — then **Share ▸ Add to Home Screen**.
+
+> **On iOS 26+, check the "Open as Web App" toggle before tapping Add.**
+> It must be **ON**. Switched off, iOS creates a plain bookmark that opens in
+> Safari no matter what the page declares — correct icon, correct metadata, but
+> not an app. iOS remembers the choice per site, so if a shortcut is stuck
+> opening in Safari: delete the icon, clear the site under *Settings ▸ Safari ▸
+> Advanced ▸ Website Data*, then re-add with the toggle on.
+
+You get a "P/E <10" icon named **Deep Value** that launches full-screen, with no
+browser chrome, and keeps working offline.
+
+The strip at the top of the app reports which mode it is running in, and the
+footer shows the build — useful for confirming a phone picked up a new deploy.
 
 ## Editing the UI or refreshing the data
 
