@@ -19,7 +19,9 @@ app** (`app.html`) that presents the results and lets you adjust the filters.
 
 | File | What it is |
 |------|------------|
-| `app.html` | The mobile app. Open it in any browser (works offline). Adjust the P/E slider and toggles to re-screen. |
+| `index.html` | **The installable app.** Full PWA — add to your iPhone home screen (see below). Generated from `app.html` by `build.py`. |
+| `app.html` | The shared UI / Claude Artifact copy. Edit this one, then run `build.py`. |
+| `manifest.webmanifest`, `sw.js`, `*.png` | PWA plumbing: app metadata, offline cache, and home-screen icons. |
 | `data.json` | The dataset the app reads. Schema below. |
 | `screener.py` | Live engine — pulls fundamentals from Yahoo Finance and rewrites `data.json`. |
 
@@ -60,12 +62,39 @@ python screener.py --universe my_codes.txt   # one ASX code per line, e.g. "BHP"
 It rewrites `data.json` and prints the first ten to the terminal. Reopen
 `app.html` (served over http, e.g. `python -m http.server`) to see the refresh.
 
-## Use it as a mobile app
+## Install it on your iPhone (home-screen app)
 
-- **Quick:** open `app.html` on your phone's browser and tap **Share ▸ Add to
-  Home Screen**. It runs offline using the bundled dataset.
-- **Live:** serve the folder (`python -m http.server 8000`) and browse to it so
-  the app loads the freshly generated `data.json`.
+`index.html` is a full PWA: installed, it launches full-screen with its own
+icon and no Safari chrome, and works offline.
+
+**1. Publish the folder once (GitHub Pages)**
+
+In the repo on GitHub: **Settings ▸ Pages**, set *Source* to **Deploy from a
+branch**, choose the branch holding this folder and folder **`/ (root)`**, then
+**Save**. After a minute the app is live at:
+
+```
+https://jdkennelly2.github.io/Down-under-dive/asx-screener/
+```
+
+**2. Add it to the home screen**
+
+Open that URL in **Safari** on the iPhone (it must be Safari — Chrome can't
+install web apps on iOS), then **Share ▸ Add to Home Screen ▸ Add**. You'll get
+a "P/E <10" icon named **Deep Value** that opens full-screen like any app.
+
+To update the app later, push a change and pull-to-refresh once inside it (the
+service worker caches the shell, so bump `CACHE` in `sw.js` for a hard refresh).
+
+## Editing the UI
+
+`app.html` is the single source of the interface (it doubles as the Claude
+Artifact copy). After editing it, regenerate the installable page:
+
+```bash
+python build.py        # app.html -> index.html (adds the iOS/PWA head)
+python make_icon.py    # only if you want to redraw the icons
+```
 
 ## `data.json` schema
 
