@@ -12,7 +12,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#eef0f4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0b0f15" media="(prefers-color-scheme: dark)">
-<link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <title>Deep Value ASX</title>
@@ -86,6 +85,15 @@
     -webkit-font-smoothing:antialiased;
   }
   .wrap{max-width:560px;margin:0 auto;padding:0 16px 64px;}
+
+  /* ---- Mode strip (says whether iOS launched this as an app) ---- */
+  .modebar{
+    font-family:var(--font-mono);font-size:11px;font-weight:600;
+    letter-spacing:.08em;text-transform:uppercase;text-align:center;
+    padding:9px 12px;border-radius:9px;margin:12px 0 0;
+  }
+  .modebar.installed{background:var(--pass-bg);color:var(--pass);}
+  .modebar.browser{background:var(--warn-bg);color:var(--warn);}
 
   /* ---- Masthead ---- */
   header{padding:26px 0 18px;}
@@ -273,6 +281,8 @@
 </head>
 <body>
 <div class="wrap">
+  <div class="modebar" id="modebar"></div>
+
   <header>
     <p class="kicker">ASX Value Screen</p>
     <h1>Deep&nbsp;Value <em>Down&nbsp;Under</em></h1>
@@ -432,12 +442,19 @@
 
   [peIn,cfIn,phIn,mxIn].forEach(el => el.addEventListener("input", render));
 
-  const BUILD = "2026-09-10.4";
+  const BUILD = "2026-09-10.5";
 
   function reportMode(){
     const installed = matchMedia("(display-mode: standalone)").matches
                    || matchMedia("(display-mode: fullscreen)").matches
                    || navigator.standalone === true;
+    const bar = $("#modebar");
+    if (bar){
+      bar.className = "modebar " + (installed ? "installed" : "browser");
+      bar.textContent = installed
+        ? `✓ Installed app · build ${BUILD}`
+        : `In browser — not installed · build ${BUILD}`;
+    }
     const el = $("#mode");
     if (!el) return;
     el.innerHTML = installed

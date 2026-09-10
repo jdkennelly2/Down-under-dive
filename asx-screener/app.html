@@ -70,6 +70,15 @@
   }
   .wrap{max-width:560px;margin:0 auto;padding:0 16px 64px;}
 
+  /* ---- Mode strip (says whether iOS launched this as an app) ---- */
+  .modebar{
+    font-family:var(--font-mono);font-size:11px;font-weight:600;
+    letter-spacing:.08em;text-transform:uppercase;text-align:center;
+    padding:9px 12px;border-radius:9px;margin:12px 0 0;
+  }
+  .modebar.installed{background:var(--pass-bg);color:var(--pass);}
+  .modebar.browser{background:var(--warn-bg);color:var(--warn);}
+
   /* ---- Masthead ---- */
   header{padding:26px 0 18px;}
   .kicker{
@@ -231,6 +240,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 
 <div class="wrap">
+  <div class="modebar" id="modebar"></div>
+
   <header>
     <p class="kicker">ASX Value Screen</p>
     <h1>Deep&nbsp;Value <em>Down&nbsp;Under</em></h1>
@@ -390,12 +401,19 @@
 
   [peIn,cfIn,phIn,mxIn].forEach(el => el.addEventListener("input", render));
 
-  const BUILD = "2026-09-10.4";
+  const BUILD = "2026-09-10.5";
 
   function reportMode(){
     const installed = matchMedia("(display-mode: standalone)").matches
                    || matchMedia("(display-mode: fullscreen)").matches
                    || navigator.standalone === true;
+    const bar = $("#modebar");
+    if (bar){
+      bar.className = "modebar " + (installed ? "installed" : "browser");
+      bar.textContent = installed
+        ? `✓ Installed app · build ${BUILD}`
+        : `In browser — not installed · build ${BUILD}`;
+    }
     const el = $("#mode");
     if (!el) return;
     el.innerHTML = installed
