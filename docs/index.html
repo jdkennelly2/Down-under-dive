@@ -321,6 +321,7 @@
     <span class="warn">General information only — not financial advice. Figures are indicative and change daily; verify against a live source before acting.</span>
     <span id="srcNote"></span>
     <p style="margin:10px 0 0">Data blended from public sources on the “as of” date. To pull fresh figures, run <code style="font-family:var(--font-mono)">screener.py</code> (see the project README) — it queries live market data and rewrites this list.</p>
+    <p class="mode" id="mode"></p>
   </footer>
 </div>
 
@@ -437,7 +438,9 @@
     const installed = matchMedia("(display-mode: standalone)").matches
                    || matchMedia("(display-mode: fullscreen)").matches
                    || navigator.standalone === true;
-    $("#mode").innerHTML = installed
+    const el = $("#mode");
+    if (!el) return;
+    el.innerHTML = installed
       ? `<b>✓ Running as an installed app</b> · build ${BUILD}`
       : `<i>Running in the browser</i> · build ${BUILD} · Share ▸ Add to Home Screen to install`;
   }
