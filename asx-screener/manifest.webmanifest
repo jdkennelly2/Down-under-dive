@@ -2,14 +2,13 @@
   "name": "Deep Value ASX",
   "short_name": "Deep Value",
   "description": "Screen ASX shares for a P/E under 10, positive cash flow, and no pharma or mining explorers.",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/Down-under-dive/",
+  "scope": "/Down-under-dive/",
   "display": "standalone",
   "display_override": [
     "standalone",
     "minimal-ui"
   ],
-  "orientation": "portrait",
   "background_color": "#0d5c68",
   "theme_color": "#0d5c68",
   "categories": [
