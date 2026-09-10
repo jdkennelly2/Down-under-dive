@@ -235,6 +235,12 @@
     border-radius:10px;padding:10px 12px;margin-bottom:12px;font-weight:500;
   }
   footer a{color:var(--accent-ink);}
+  footer .mode{
+    margin:14px 0 0;padding-top:12px;border-top:1px solid var(--hair);
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.03em;color:var(--muted);
+  }
+  footer .mode b{color:var(--pass);}
+  footer .mode i{color:var(--warn);font-style:normal;}
   @media (prefers-reduced-motion: reduce){*{transition:none !important;}}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -425,7 +431,19 @@
 
   [peIn,cfIn,phIn,mxIn].forEach(el => el.addEventListener("input", render));
 
+  const BUILD = "2026-09-10.3";
+
+  function reportMode(){
+    const installed = matchMedia("(display-mode: standalone)").matches
+                   || matchMedia("(display-mode: fullscreen)").matches
+                   || navigator.standalone === true;
+    $("#mode").innerHTML = installed
+      ? `<b>✓ Running as an installed app</b> · build ${BUILD}`
+      : `<i>Running in the browser</i> · build ${BUILD} · Share ▸ Add to Home Screen to install`;
+  }
+
   function boot(){
+    reportMode();
     $("#asOf").textContent = DATA.meta.asOf;
     $("#universeN").textContent = DATA.stocks.length;
     $("#srcNote").textContent = DATA.meta.source;

@@ -1,5 +1,5 @@
 // Offline shell for Deep Value ASX. Bump CACHE when you change the app.
-const CACHE = "deep-value-asx-v1";
+const CACHE = "deep-value-asx-v2";
 const CORE = [
   "./", "./index.html", "./data.json", "./manifest.webmanifest",
   "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"
@@ -26,9 +26,10 @@ self.addEventListener("fetch", e => {
   const { request } = e;
   if (request.method !== "GET") return;
 
-  // Always try the network first for data so a fresh screener run shows up,
-  // falling back to the cached copy when offline.
-  if (request.url.includes("data.json")) {
+  // Network-first for the page itself and the data: an installed app must be
+  // able to pick up a new build, and a fresh screener run must show through.
+  // Cache-first here would pin the app to whatever copy it first cached.
+  if (request.mode === "navigate" || /\.html$|data\.json$|manifest\.webmanifest$/.test(request.url)) {
     e.respondWith(
       fetch(request)
         .then(r => {
