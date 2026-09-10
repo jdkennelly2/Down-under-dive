@@ -6,6 +6,11 @@ A small mobile-first app that screens **Australian (ASX) shares** for:
 2. **Cash-flow positive** (free cash flow > 0, else operating cash flow > 0)
 3. **Not pharmaceutical / biotech**
 4. **Not mining, commodities or energy** — producers and explorers alike
+5. **Not a REIT** — property trusts, whose earnings are distorted by
+   revaluations. Real-estate *services* businesses (valuers, agents) are kept:
+   they are operating companies, not trusts
+6. **Not a fund manager** — asset managers specifically, not financials
+   broadly, so banks, insurers, lenders and leasing businesses still qualify
 
 **Dividend yield** and **payout ratio** are shown for everything that passes, as
 extra context rather than screening criteria. A payout ratio above 100% is
@@ -30,37 +35,38 @@ app** (`app.html`) that presents the results and lets you adjust the filters.
 | `screener.py` | Live engine — pulls fundamentals from Yahoo Finance and rewrites `data.json`. |
 | `build.py` | Builds the deployable site into `../docs/` (what GitHub Pages serves). |
 
-## The first ten (as of 2026-09-10)
+## What passes today (as of 2026-09-10)
 
 Compiled from public sources (GuruFocus, StockAnalysis, Simply Wall St,
 Stockopedia, Kalkine, company results). Indicative, ranked by P/E:
 
 | # | Code | Company | Sector | ~P/E | Yield | Payout |
 |---|------|---------|--------|-----:|------:|-------:|
-| 1 | CQR | Charter Hall Retail REIT | Real Estate | 6.2 | 8.5% | 52% |
-| 2 | HLI | Helia Group | Financials | 6.6 | 6.1% | — |
-| 3 | HDN | HomeCo Daily Needs REIT | Real Estate | 6.8 | 6.9% | 213% ⚠ |
-| 4 | GQG | GQG Partners | Financials | 7.2 | 14.4% | 94% |
-| 5 | DXS | Dexus | Real Estate | 7.3 | 5.4% | 58% |
-| 6 | WPR | Waypoint REIT | Real Estate | 8.0 | 6.8% | 86% |
-| 7 | GNC | GrainCorp | Consumer Staples | 8.0 | 7.2% | 154% ⚠ |
-| 8 | GPT | GPT Group | Real Estate | 8.3 | 5.2% | — |
-| 9 | RGN | Region Group | Real Estate | 8.8 | 6.3% | 86% |
-| 10 | QAN | Qantas Airways | Industrials | 9.9 | 5.4% | — |
+| 1 | HLI | Helia Group | Financials (mortgage insurance) | 6.6 | 6.1% | — |
+| 2 | GNC | GrainCorp | Consumer Staples | 8.0 | 7.2% | 154% ⚠ |
+| 3 | ASG | Autosports Group | Consumer Discretionary | 8.4 | 2.7% | 44% |
+| 4 | MTO | MotorCycle Holdings | Consumer Discretionary | 8.5 | 5.4% | 54% |
+| 5 | QAN | Qantas Airways | Industrials | 9.9 | 5.4% | — |
 
-Excluding mining and energy pushes this screen heavily into **REITs and
-financials** — six of the ten are property trusts. Worth knowing before acting
-on it: that is a concentrated sector bet, and a REIT's earnings-based P/E is
-distorted by property revaluations, so read it alongside funds-from-operations
-rather than on its own.
+**Five, not ten** — and that is the honest output, not a gap to be padded. Each
+exclusion is individually reasonable, but stacked they remove most of what
+trades under 10× on the ASX: resources take the cyclicals, the REIT rule takes
+the property trusts, and the fund-manager rule takes the asset managers. The app
+shows however many pass and says so.
 
-Two payouts exceed earnings (HDN 213%, GNC 154%) — ordinary enough for a REIT
-distributing from cash flow, more of a warning sign for an industrial. A dash
-means the source did not report a figure; the app never invents one.
+Nudging the P/E ceiling shows what is just out of reach:
 
-Notable exclusions: Ampol (P/E 6.8), Yancoal (8.0), Whitehaven (9.5) and Regis
-(9.9) would all rank near the top but are screened out as mining or energy.
-Toggle "Exclude mining & energy" off in the app to see them.
+| Ceiling | Adds |
+|---------|------|
+| 11 | HVN (10.4), PWR (10.5) |
+| 12 | MMS (11.4), SWM (11.6) |
+| 15 | **ACU Acumentis (14.4)** |
+
+**On Acumentis:** it clears every sector rule — a property *valuation and
+advisory* business, not a trust, so the REIT filter correctly leaves it in — and
+it is cash-flow positive with a comfortable 34% payout. It fails on one thing
+only: a P/E of ~14.4. If it belongs in the screen, the P/E ceiling is the
+setting to revisit, not the sector rules.
 
 ## Run the live screener
 

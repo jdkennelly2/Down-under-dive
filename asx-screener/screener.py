@@ -7,6 +7,11 @@ Screens ASX-listed shares for:
   2. Cash-flow positive (free cash flow > 0, else operating cash flow > 0)
   3. NOT pharmaceutical / biotech
   4. NOT mining, commodities or energy (producers and explorers alike)
+  5. NOT a REIT — property trusts, whose earnings are distorted by
+     revaluations. Real-estate *services* businesses (valuers, agents)
+     are kept: they are operating companies, not trusts.
+  6. NOT a fund manager — asset managers specifically, not financials
+     broadly, so banks, insurers and lenders still qualify.
 
 Dividend yield and payout ratio are collected and reported for whatever
 passes, as extra context — they are not screening criteria.
@@ -73,6 +78,13 @@ MINING_HINTS = ("mining", "metals", "coal", "gold", "copper", "iron",
                 "aluminium", "commodit")
 ENERGY_HINTS = ("oil", "gas", "petroleum", "refin", "drilling", "coking",
                 "thermal coal", "energy")
+# A trust, not a property business: "REIT" in the industry is the reliable
+# marker. Deliberately does NOT match real-estate services — a valuation or
+# agency firm is an operating company and should still be screened in.
+REIT_HINTS = ("reit", "real estate investment trust")
+# Asset managers specifically. Kept narrow so banks, insurers, lenders,
+# exchanges and leasing businesses are not swept up as "financials".
+FUND_MANAGER_HINTS = ("asset management", "fund manage", "investment manage")
 
 def pct(v, already_pct=False):
     """Normalise a rate to a percentage, or None when not reported."""
@@ -121,6 +133,19 @@ def is_resources_or_energy(info):
     return any(h in industry for h in MINING_HINTS + ENERGY_HINTS)
 
 
+def is_reit(info):
+    """A listed property trust. Real-estate services firms are not REITs."""
+    industry = (info.get("industry") or "").lower()
+    name = ((info.get("shortName") or "") + " " + (info.get("longName") or "")).lower()
+    return any(h in industry for h in REIT_HINTS) or " reit" in name
+
+
+def is_fund_manager(info):
+    """An asset manager — not financials in general."""
+    industry = (info.get("industry") or "").lower()
+    return any(h in industry for h in FUND_MANAGER_HINTS)
+
+
 def is_pharma(info):
     text = ((info.get("industry") or "") + " " + (info.get("sector") or "")).lower()
     return any(h in text for h in PHARMA_HINTS)
@@ -152,6 +177,8 @@ def fetch(code):
         "payoutRatio": pct(info.get("payoutRatio")),
         "isMiningExploration": looks_like_explorer(info),
         "isResourcesEnergy": is_resources_or_energy(info),
+        "isREIT": is_reit(info),
+        "isFundManager": is_fund_manager(info),
         "note": "",
     }
 
@@ -161,6 +188,8 @@ def passes(s, pe_max):
         not s["isPharma"]
         and not s["isResourcesEnergy"]
         and not s["isMiningExploration"]
+        and not s["isREIT"]
+        and not s["isFundManager"]
         and s["cashFlowPositive"]
         and s["pe"] is not None
         and s["pe"] < pe_max
@@ -172,12 +201,19 @@ def main():
     ap.add_argument("--pe-max", type=float, default=10.0, help="Maximum trailing P/E (default 10)")
     ap.add_argument("--include-resources", action="store_true",
                     help="Keep mining, commodity and energy names in the results")
+    ap.add_argument("--include-reits", action="store_true",
+                    help="Keep property trusts in the results")
+    ap.add_argument("--include-fund-managers", action="store_true",
+                    help="Keep asset managers in the results")
     ap.add_argument("--universe", help="File with one ASX code per line")
     ap.add_argument("--out", default=str(HERE / "data.json"), help="Output JSON path")
     args = ap.parse_args()
 
     codes = load_universe(args.universe)
-    excl = "ex-pharma" if args.include_resources else "ex-pharma, ex-mining/energy"
+    excl = ", ".join(["ex-pharma"]
+                     + ([] if args.include_resources else ["ex-mining/energy"])
+                     + ([] if args.include_reits else ["ex-REITs"])
+                     + ([] if args.include_fund_managers else ["ex-fund-managers"]))
     print(f"Screening {len(codes)} ASX codes (P/E < {args.pe_max}, cash-flow "
           f"positive, {excl})...\n", file=sys.stderr)
 
@@ -192,10 +228,20 @@ def main():
             print(f"  [{i}/{len(codes)}] {code:5} skipped ({type(e).__name__})", file=sys.stderr)
         time.sleep(0.4)  # be gentle on the API
 
-    keep = passes if not args.include_resources else (
-        lambda s, m: not s["isPharma"] and s["cashFlowPositive"]
-        and s["pe"] is not None and s["pe"] < m)
-    matches = sorted([r for r in rows if keep(r, args.pe_max)], key=lambda r: r["pe"])
+    def keep(s):
+        if s["isPharma"] or not s["cashFlowPositive"]:
+            return False
+        if s["pe"] is None or s["pe"] >= args.pe_max:
+            return False
+        if not args.include_resources and (s["isResourcesEnergy"] or s["isMiningExploration"]):
+            return False
+        if not args.include_reits and s["isREIT"]:
+            return False
+        if not args.include_fund_managers and s["isFundManager"]:
+            return False
+        return True
+
+    matches = sorted([r for r in rows if keep(r)], key=lambda r: r["pe"])
 
     payload = {
         "meta": {
@@ -205,7 +251,8 @@ def main():
                 "peMax": args.pe_max,
                 "cashFlowPositive": True,
                 "excludeSectors": ["Pharmaceuticals", "Biotechnology",
-                                   "Mining & commodities", "Energy"],
+                                   "Mining & commodities", "Energy",
+                                   "REITs", "Fund managers"],
             },
             "source": f"Live pull from Yahoo Finance via yfinance on {dt.date.today().isoformat()}.",
             "disclaimer": "General information only, not financial advice. Verify before acting.",
