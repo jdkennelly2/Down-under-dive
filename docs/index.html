@@ -212,6 +212,24 @@
   .chip.cf::before{content:"▲ ";font-size:9px;}
   .cardnote{grid-column:1/4;font-size:12px;color:var(--muted);line-height:1.4;}
 
+  /* dividend context — secondary to the screen, not a filter */
+  .divs{
+    grid-column:1/4;display:flex;gap:18px;align-items:baseline;
+    padding-top:9px;border-top:1px dashed var(--hair);
+  }
+  .divs div{display:flex;flex-direction:column;gap:1px;}
+  .divs dt{
+    font-family:var(--font-mono);font-size:9px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--muted);
+  }
+  .divs dd{
+    margin:0;font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+    font-size:14px;font-weight:600;color:var(--ink);
+  }
+  .divs dd.none{color:var(--muted);font-weight:400;}
+  .divs dd.strain{color:var(--warn);}
+  .divs dd.strain::after{content:" \26A0";font-size:10px;}
+
   .empty{
     text-align:center;color:var(--muted);font-size:14px;
     padding:34px 16px;border:1px dashed var(--hair-strong);border-radius:14px;
@@ -287,7 +305,7 @@
   <header>
     <p class="kicker">ASX Value Screen</p>
     <h1>Deep&nbsp;Value <em>Down&nbsp;Under</em></h1>
-    <p class="sub">Australian shares filtered for a low earnings multiple, positive cash flow, and no pharma or mining explorers.</p>
+    <p class="sub">Australian shares filtered for a low earnings multiple and positive cash flow, with pharma, mining and energy screened out.</p>
     <div class="stamp">
       <span>As of <b id="asOf">—</b></span><span class="dot">/</span>
       <span><b id="universeN">—</b> in universe</span><span class="dot">/</span>
@@ -311,7 +329,7 @@
       <span class="switch"><input id="ph" type="checkbox" checked><span class="track"></span></span>
     </div>
     <div class="ctl">
-      <label for="mx">Exclude mining exploration<span class="hint">Pre-revenue explorers screened out</span></label>
+      <label for="mx">Exclude mining &amp; energy<span class="hint">Commodities, producers and explorers screened out</span></label>
       <span class="switch"><input id="mx" type="checkbox" checked><span class="track"></span></span>
     </div>
   </section>
@@ -340,30 +358,349 @@
   // Fallback dataset (mirrors data.json). When served over http(s), the app
   // fetches ./data.json and uses that instead, so re-running screener.py updates the app.
   const SEED = {
-    "meta":{
-      "asOf":"2026-09-09",
-      "source":"Indicative figures blended from public sources (GuruFocus, StockAnalysis, Simply Wall St, Stockopedia, company results) as researched on 2026-09-09. P/E varies by methodology. Not live — regenerate with screener.py."
+  "meta": {
+    "asOf": "2026-09-10",
+    "source": "Indicative figures blended from public sources (GuruFocus, StockAnalysis, Simply Wall St, Stockopedia, Kalkine, company results) as researched on 2026-09-10. P/E, yield and payout vary by source and methodology (trailing vs forward, and whether special dividends are counted). Not live — regenerate with screener.py for current data."
+  },
+  "stocks": [
+    {
+      "ticker": "CQR",
+      "name": "Charter Hall Retail REIT",
+      "sector": "Real Estate",
+      "industry": "Retail REIT",
+      "pe": 6.15,
+      "dividendYield": 8.54,
+      "payoutRatio": 52.0,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Convenience and supermarket-anchored centres. Lowest multiple on the screen, with the payout comfortably covered."
     },
-    "stocks":[
-      {"ticker":"ALD","name":"Ampol","sector":"Energy","industry":"Fuel refining & marketing","pe":6.8,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Downstream fuels; strong operating cash generation."},
-      {"ticker":"GQG","name":"GQG Partners","sector":"Financials","industry":"Asset management","pe":7.2,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Capital-light funds manager; high cash conversion."},
-      {"ticker":"DXS","name":"Dexus","sector":"Real Estate","industry":"Diversified REIT","pe":7.3,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Free-cash-flow yield ~10%. P/E on a discounted REIT."},
-      {"ticker":"GNC","name":"GrainCorp","sector":"Consumer Staples","industry":"Agribusiness","pe":8.0,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Grain handling & processing; earnings are seasonal/cyclical."},
-      {"ticker":"YAL","name":"Yancoal Australia","sector":"Energy","industry":"Coal — producer","pe":8.0,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Producing coal miner (not explorer). Commodity-price sensitive."},
-      {"ticker":"GPT","name":"GPT Group","sector":"Real Estate","industry":"Diversified REIT","pe":8.3,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Office/retail/logistics REIT trading below NTA."},
-      {"ticker":"RGN","name":"Region Group","sector":"Real Estate","industry":"Retail REIT","pe":8.8,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Convenience/neighbourhood retail landlord; steady rents."},
-      {"ticker":"WHC","name":"Whitehaven Coal","sector":"Energy","industry":"Coal — producer","pe":9.5,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Producing coal miner (not explorer). Highly cyclical earnings."},
-      {"ticker":"RRL","name":"Regis Resources","sector":"Materials","industry":"Gold — producer","pe":9.9,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Producing gold miner (not explorer). Leveraged to gold price."},
-      {"ticker":"QAN","name":"Qantas Airways","sector":"Industrials","industry":"Airline","pe":9.9,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Strong operating cash flow, but free cash flow swings with fleet capex — check latest."},
-      {"ticker":"HVN","name":"Harvey Norman","sector":"Consumer Discretionary","industry":"Retail","pe":10.4,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Just above the P/E<10 line on trailing earnings; passes if you widen the threshold."},
-      {"ticker":"SGP","name":"Stockland","sector":"Real Estate","industry":"Diversified REIT","pe":10.9,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Residential/retail REIT; narrowly above the P/E cutoff."},
-      {"ticker":"FMG","name":"Fortescue","sector":"Materials","industry":"Iron ore — producer","pe":11.0,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Major iron-ore producer; above the P/E cutoff at present."},
-      {"ticker":"STO","name":"Santos","sector":"Energy","industry":"Oil & gas","pe":21.4,"cashFlowPositive":true,"isPharma":false,"isMiningExploration":false,"note":"Trailing P/E well above 10 (forward ~12); fails the earnings-multiple test."},
-      {"ticker":"CRN","name":"Coronado Global Resources","sector":"Energy","industry":"Coal — producer","pe":null,"cashFlowPositive":false,"isPharma":false,"isMiningExploration":false,"note":"Loss-making — no meaningful P/E; fails cash-flow/earnings screen."},
-      {"ticker":"CSL","name":"CSL","sector":"Health Care","industry":"Biotechnology / pharmaceuticals","pe":27.0,"cashFlowPositive":true,"isPharma":true,"isMiningExploration":false,"note":"Excluded by rule: pharmaceutical / biotech sector."},
-      {"ticker":"CHN","name":"Chalice Mining","sector":"Materials","industry":"Mineral exploration","pe":null,"cashFlowPositive":false,"isPharma":false,"isMiningExploration":true,"note":"Excluded by rule: pre-revenue mining explorer (no earnings)."}
-    ]
-  };
+    {
+      "ticker": "HLI",
+      "name": "Helia Group",
+      "sector": "Financials",
+      "industry": "Mortgage insurance",
+      "pe": 6.64,
+      "dividendYield": 6.07,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Lenders mortgage insurer. Headline yields near 22% appear when special dividends are counted — the ordinary yield is ~6%. New business is shrinking."
+    },
+    {
+      "ticker": "HDN",
+      "name": "HomeCo Daily Needs REIT",
+      "sector": "Real Estate",
+      "industry": "Retail REIT",
+      "pe": 6.76,
+      "dividendYield": 6.94,
+      "payoutRatio": 212.5,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Daily-needs retail landlord. Payout far exceeds earnings — REIT distributions are paid from cash flow, but check coverage."
+    },
+    {
+      "ticker": "GQG",
+      "name": "GQG Partners",
+      "sector": "Financials",
+      "industry": "Asset management",
+      "pe": 7.22,
+      "dividendYield": 14.4,
+      "payoutRatio": 94.05,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Capital-light funds manager, high cash conversion. The very high yield reflects a fallen share price; sources quote 10–14% and payout is ~94%."
+    },
+    {
+      "ticker": "DXS",
+      "name": "Dexus",
+      "sector": "Real Estate",
+      "industry": "Diversified REIT",
+      "pe": 7.3,
+      "dividendYield": 5.44,
+      "payoutRatio": 57.74,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Office, industrial and funds management. Free-cash-flow yield ~10% and the best-covered payout on the list."
+    },
+    {
+      "ticker": "WPR",
+      "name": "Waypoint REIT",
+      "sector": "Real Estate",
+      "industry": "Net-lease REIT",
+      "pe": 7.98,
+      "dividendYield": 6.84,
+      "payoutRatio": 85.7,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Landlord of service-station property on long leases — a property business, not an energy one, so it clears the resources filter."
+    },
+    {
+      "ticker": "GNC",
+      "name": "GrainCorp",
+      "sector": "Consumer Staples",
+      "industry": "Agribusiness",
+      "pe": 8.03,
+      "dividendYield": 7.24,
+      "payoutRatio": 154.39,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Grain handling and processing. Earnings swing with the harvest, and the payout currently exceeds earnings."
+    },
+    {
+      "ticker": "GPT",
+      "name": "GPT Group",
+      "sector": "Real Estate",
+      "industry": "Diversified REIT",
+      "pe": 8.33,
+      "dividendYield": 5.21,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Office, retail and logistics REIT trading below net tangible assets."
+    },
+    {
+      "ticker": "RGN",
+      "name": "Region Group",
+      "sector": "Real Estate",
+      "industry": "Retail REIT",
+      "pe": 8.79,
+      "dividendYield": 6.35,
+      "payoutRatio": 86.64,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Neighbourhood and convenience retail landlord with steady rents and a rising distribution history."
+    },
+    {
+      "ticker": "QAN",
+      "name": "Qantas Airways",
+      "sector": "Industrials",
+      "industry": "Airline",
+      "pe": 9.9,
+      "dividendYield": 5.4,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Strong operating cash flow, but free cash flow swings with fleet capex. Dividend resumed recently, fully franked."
+    },
+    {
+      "ticker": "HVN",
+      "name": "Harvey Norman",
+      "sector": "Consumer Discretionary",
+      "industry": "Retail",
+      "pe": 10.4,
+      "dividendYield": 6.1,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Just above the P/E<10 line on trailing earnings; passes if you widen the threshold."
+    },
+    {
+      "ticker": "SGP",
+      "name": "Stockland",
+      "sector": "Real Estate",
+      "industry": "Diversified REIT",
+      "pe": 10.85,
+      "dividendYield": 4.9,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Residential and retail REIT; narrowly above the P/E cutoff."
+    },
+    {
+      "ticker": "SWM",
+      "name": "Seven West Media",
+      "sector": "Communication Services",
+      "industry": "Broadcasting",
+      "pe": 11.57,
+      "dividendYield": 0.0,
+      "payoutRatio": 0.0,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Above the cutoff and pays no dividend at present."
+    },
+    {
+      "ticker": "APE",
+      "name": "Eagers Automotive",
+      "sector": "Consumer Discretionary",
+      "industry": "Auto retail",
+      "pe": 18.33,
+      "dividendYield": 4.9,
+      "payoutRatio": 85.0,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Re-rated well above the cutoff; payout supported by cash flows."
+    },
+    {
+      "ticker": "GOZ",
+      "name": "Growthpoint Properties",
+      "sector": "Real Estate",
+      "industry": "Office REIT",
+      "pe": 43.2,
+      "dividendYield": 8.48,
+      "payoutRatio": 78.2,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "High yield but earnings-based P/E is far above the cutoff."
+    },
+    {
+      "ticker": "ALD",
+      "name": "Ampol",
+      "sector": "Energy",
+      "industry": "Fuel refining & marketing",
+      "pe": 6.8,
+      "dividendYield": 7.3,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "note": "Excluded by rule: energy. Would otherwise rank near the top on P/E."
+    },
+    {
+      "ticker": "YAL",
+      "name": "Yancoal Australia",
+      "sector": "Energy",
+      "industry": "Coal — producer",
+      "pe": 8.0,
+      "dividendYield": 10.5,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "note": "Excluded by rule: mining & energy (coal producer)."
+    },
+    {
+      "ticker": "WHC",
+      "name": "Whitehaven Coal",
+      "sector": "Energy",
+      "industry": "Coal — producer",
+      "pe": 9.46,
+      "dividendYield": 3.6,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "note": "Excluded by rule: mining & energy (coal producer)."
+    },
+    {
+      "ticker": "RRL",
+      "name": "Regis Resources",
+      "sector": "Materials",
+      "industry": "Gold — producer",
+      "pe": 9.89,
+      "dividendYield": 1.2,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "note": "Excluded by rule: mining & commodities (gold producer)."
+    },
+    {
+      "ticker": "FMG",
+      "name": "Fortescue",
+      "sector": "Materials",
+      "industry": "Iron ore — producer",
+      "pe": 11.02,
+      "dividendYield": 8.9,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "note": "Excluded by rule: mining & commodities. Also above the P/E cutoff."
+    },
+    {
+      "ticker": "STO",
+      "name": "Santos",
+      "sector": "Energy",
+      "industry": "Oil & gas",
+      "pe": 21.39,
+      "dividendYield": 3.1,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "note": "Excluded by rule: energy. Also above the P/E cutoff."
+    },
+    {
+      "ticker": "CRN",
+      "name": "Coronado Global Resources",
+      "sector": "Energy",
+      "industry": "Coal — producer",
+      "pe": null,
+      "dividendYield": 0.0,
+      "payoutRatio": null,
+      "cashFlowPositive": false,
+      "isPharma": false,
+      "isMiningExploration": false,
+      "isResourcesEnergy": true,
+      "note": "Excluded by rule: mining & energy. Also loss-making."
+    },
+    {
+      "ticker": "CSL",
+      "name": "CSL",
+      "sector": "Health Care",
+      "industry": "Biotechnology / pharmaceuticals",
+      "pe": 27.0,
+      "dividendYield": 1.6,
+      "payoutRatio": null,
+      "cashFlowPositive": true,
+      "isPharma": true,
+      "isMiningExploration": false,
+      "isResourcesEnergy": false,
+      "note": "Excluded by rule: pharmaceutical / biotech sector."
+    },
+    {
+      "ticker": "CHN",
+      "name": "Chalice Mining",
+      "sector": "Materials",
+      "industry": "Mineral exploration",
+      "pe": null,
+      "dividendYield": 0.0,
+      "payoutRatio": null,
+      "cashFlowPositive": false,
+      "isPharma": false,
+      "isMiningExploration": true,
+      "isResourcesEnergy": true,
+      "note": "Excluded by rule: pre-revenue mining explorer (no earnings)."
+    }
+  ]
+};
 
   const $ = s => document.querySelector(s);
   const listEl = $("#list"), exListEl = $("#exList"), exWrap = $("#exWrap");
@@ -372,7 +709,9 @@
 
   function classify(s, opts){
     if(s.isPharma && opts.ph) return {pass:false, sev:"fail", why:"Pharma / biotech"};
-    if(s.isMiningExploration && opts.mx) return {pass:false, sev:"fail", why:"Mining exploration"};
+    if(opts.mx && (s.isResourcesEnergy || s.isMiningExploration))
+      return {pass:false, sev:"fail",
+              why: s.isMiningExploration ? "Mining exploration" : "Mining / energy"};
     if(opts.cf && !s.cashFlowPositive) return {pass:false, sev:"fail", why:"Not cash-flow positive"};
     if(s.pe === null) return {pass:false, sev:"fail", why:"No earnings (P/E n/a)"};
     if(s.pe >= opts.pe){
@@ -427,8 +766,20 @@
          <span class="chip">${s.industry}</span>
          <span class="chip cf">Cash-flow positive</span>
        </div>
-       <div class="cardnote">${s.note}</div>`;
+       <div class="cardnote">${s.note}</div>
+       <dl class="divs">
+         <div><dt>Div yield</dt>${stat(s.dividendYield, "%")}</div>
+         <div><dt>Payout</dt>${stat(s.payoutRatio, "%", 100)}</div>
+       </dl>`;
     return li;
+  }
+
+  // Renders a figure, or an em dash when the source did not report one —
+  // never a guess. strainAbove marks a value that signals trouble.
+  function stat(v, unit, strainAbove){
+    if(v === null || v === undefined) return '<dd class="none">\u2014</dd>';
+    const strained = strainAbove !== undefined && v > strainAbove;
+    return `<dd class="${strained ? "strain" : ""}">${v.toFixed(1)}${unit}</dd>`;
   }
 
   function exRow(s, r){
@@ -443,7 +794,7 @@
 
   [peIn,cfIn,phIn,mxIn].forEach(el => el.addEventListener("input", render));
 
-  const BUILD = "2026-09-10.7";
+  const BUILD = "2026-09-10.9";
 
   function reportMode(){
     const installed = matchMedia("(display-mode: standalone)").matches

@@ -5,7 +5,11 @@ A small mobile-first app that screens **Australian (ASX) shares** for:
 1. **Price-to-earnings ratio under 10**
 2. **Cash-flow positive** (free cash flow > 0, else operating cash flow > 0)
 3. **Not pharmaceutical / biotech**
-4. **Not a pre-revenue mining explorer** (producing miners are allowed)
+4. **Not mining, commodities or energy** — producers and explorers alike
+
+**Dividend yield** and **payout ratio** are shown for everything that passes, as
+extra context rather than screening criteria. A payout ratio above 100% is
+flagged: the dividend exceeds earnings and may not be sustainable.
 
 It ships with a **live screening engine** (`screener.py`) and a **mobile web
 app** (`app.html`) that presents the results and lets you adjust the filters.
@@ -26,27 +30,37 @@ app** (`app.html`) that presents the results and lets you adjust the filters.
 | `screener.py` | Live engine — pulls fundamentals from Yahoo Finance and rewrites `data.json`. |
 | `build.py` | Builds the deployable site into `../docs/` (what GitHub Pages serves). |
 
-## The first ten (as of 2026-09-09)
+## The first ten (as of 2026-09-10)
 
 Compiled from public sources (GuruFocus, StockAnalysis, Simply Wall St,
-Stockopedia, company results). Indicative, ranked by P/E:
+Stockopedia, Kalkine, company results). Indicative, ranked by P/E:
 
-| # | Code | Company | Sector | ~P/E |
-|---|------|---------|--------|-----:|
-| 1 | ALD | Ampol | Energy (fuel refining) | 6.8 |
-| 2 | GQG | GQG Partners | Financials (asset mgmt) | 7.2 |
-| 3 | DXS | Dexus | Real Estate (REIT) | 7.3 |
-| 4 | GNC | GrainCorp | Consumer Staples | 8.0 |
-| 5 | YAL | Yancoal Australia | Energy (coal producer) | 8.0 |
-| 6 | GPT | GPT Group | Real Estate (REIT) | 8.3 |
-| 7 | RGN | Region Group | Real Estate (REIT) | 8.8 |
-| 8 | WHC | Whitehaven Coal | Energy (coal producer) | 9.5 |
-| 9 | RRL | Regis Resources | Materials (gold producer) | 9.9 |
-| 10 | QAN | Qantas Airways | Industrials (airline) | 9.9 |
+| # | Code | Company | Sector | ~P/E | Yield | Payout |
+|---|------|---------|--------|-----:|------:|-------:|
+| 1 | CQR | Charter Hall Retail REIT | Real Estate | 6.2 | 8.5% | 52% |
+| 2 | HLI | Helia Group | Financials | 6.6 | 6.1% | — |
+| 3 | HDN | HomeCo Daily Needs REIT | Real Estate | 6.8 | 6.9% | 213% ⚠ |
+| 4 | GQG | GQG Partners | Financials | 7.2 | 14.4% | 94% |
+| 5 | DXS | Dexus | Real Estate | 7.3 | 5.4% | 58% |
+| 6 | WPR | Waypoint REIT | Real Estate | 8.0 | 6.8% | 86% |
+| 7 | GNC | GrainCorp | Consumer Staples | 8.0 | 7.2% | 154% ⚠ |
+| 8 | GPT | GPT Group | Real Estate | 8.3 | 5.2% | — |
+| 9 | RGN | Region Group | Real Estate | 8.8 | 6.3% | 86% |
+| 10 | QAN | Qantas Airways | Industrials | 9.9 | 5.4% | — |
 
-Note: coal/gold/iron-ore *producers* pass the "no mining exploration" rule —
-only pre-revenue explorers are excluded. Qantas has strong operating cash flow,
-but its free cash flow swings with aircraft capex — check the latest report.
+Excluding mining and energy pushes this screen heavily into **REITs and
+financials** — six of the ten are property trusts. Worth knowing before acting
+on it: that is a concentrated sector bet, and a REIT's earnings-based P/E is
+distorted by property revaluations, so read it alongside funds-from-operations
+rather than on its own.
+
+Two payouts exceed earnings (HDN 213%, GNC 154%) — ordinary enough for a REIT
+distributing from cash flow, more of a warning sign for an industrial. A dash
+means the source did not report a figure; the app never invents one.
+
+Notable exclusions: Ampol (P/E 6.8), Yancoal (8.0), Whitehaven (9.5) and Regis
+(9.9) would all rank near the top but are screened out as mining or energy.
+Toggle "Exclude mining & energy" off in the app to see them.
 
 ## Run the live screener
 

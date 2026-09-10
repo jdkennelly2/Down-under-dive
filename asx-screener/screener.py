@@ -6,7 +6,10 @@ Screens ASX-listed shares for:
   1. Trailing P/E ratio below a threshold (default 10)
   2. Cash-flow positive (free cash flow > 0, else operating cash flow > 0)
   3. NOT pharmaceutical / biotech
-  4. NOT a pre-revenue mining explorer
+  4. NOT mining, commodities or energy (producers and explorers alike)
+
+Dividend yield and payout ratio are collected and reported for whatever
+passes, as extra context — they are not screening criteria.
 
 Pulls live fundamentals from Yahoo Finance via `yfinance` and writes
 `data.json` (consumed by app.html) plus prints the first ten matches.
@@ -37,20 +40,46 @@ HERE = Path(__file__).resolve().parent
 
 # A broad ASX large/mid-cap universe. Edit freely or pass --universe <file>.
 DEFAULT_UNIVERSE = [
-    "ALD", "AMC", "ANZ", "APA", "ASX", "AZJ", "BEN", "BHP", "BOQ", "BSL",
-    "BXB", "CAR", "CBA", "CGF", "CHC", "COL", "CPU", "CRN", "CSL", "DXS",
-    "EDV", "EVN", "FMG", "GMG", "GNC", "GPT", "GQG", "HVN", "IAG", "IFL",
-    "IGO", "ILU", "ING", "JBH", "JHX", "LLC", "MGR", "MIN", "MPL", "MQG",
-    "MTS", "NAB", "NCK", "NEC", "NHC", "NST", "ORG", "ORI", "PMV", "PPT",
-    "QAN", "QBE", "REA", "RGN", "RHC", "RIO", "RMD", "RRL", "S32", "SCG",
-    "SDF", "SGM", "SGP", "SHL", "STO", "SUL", "SUN", "TAH", "TCL", "TLS",
-    "TPG", "TWE", "VCX", "WBC", "WDS", "WES", "WHC", "WOR", "WOW", "YAL",
+    # Financials
+    "ANZ", "AMP", "ASX", "BEN", "BOQ", "CBA", "CGF", "COG", "CPU", "GQG",
+    "HLI", "HUB", "IAG", "IFL", "JHG", "MFG", "MPL", "MQG", "MYS", "NAB",
+    "NWL", "PNI", "PPT", "PXA", "QBE", "SDF", "SUN", "WBC",
+    # Real estate / REITs
+    "ABG", "BWP", "CHC", "CIP", "CLW", "CMW", "CNI", "CQR", "DXS", "GMG",
+    "GOZ", "GPT", "HDN", "HMC", "INA", "LLC", "MGR", "NSR", "RGN", "SCG",
+    "SGP", "VCX", "WPR",
+    # Consumer discretionary & retail
+    "ACL", "ADH", "APE", "AX1", "BAP", "BRG", "CCX", "DSK", "GUD", "HVN",
+    "JBH", "KGN", "LOV", "MTO", "NCK", "PMV", "PWR", "SNL", "SUL", "UNI",
+    "WEB",
+    # Consumer staples & agri
+    "A2M", "COL", "ELD", "EDV", "GNC", "ING", "MTS", "RIC", "TWE", "WOW",
+    # Industrials, transport & services
+    "ALQ", "AZJ", "BXB", "CAR", "CWY", "DOW", "IPH", "LNW", "MND", "MMS",
+    "QAN", "QUB", "REH", "SEK", "SGM", "SVW", "TCL", "WOR", "WTC",
+    # Communication services, tech & utilities
+    "APA", "CAT", "NEC", "NXT", "ORG", "REA", "SWM", "TLS", "TPG", "XRO",
+    # Health care (mostly filtered out by the pharma rule, kept for coverage)
+    "COH", "CSL", "FPH", "RHC", "RMD", "SHL", "SIG",
+    # Resources & energy (kept so the exclusion is visible in the output)
+    "ALD", "BHP", "EVN", "FMG", "IGO", "MIN", "NHC", "NST", "PLS", "RIO",
+    "S32", "STO", "WDS", "WHC", "YAL",
 ]
 
 PHARMA_HINTS = ("drug", "pharmaceutic", "biotech", "medical device")
 MINING_SECTORS = ("basic materials", "energy")
 MINING_HINTS = ("mining", "metals", "coal", "gold", "copper", "iron",
-                "lithium", "uranium", "nickel", "mineral")
+                "lithium", "uranium", "nickel", "mineral", "steel", "aluminum",
+                "aluminium", "commodit")
+ENERGY_HINTS = ("oil", "gas", "petroleum", "refin", "drilling", "coking",
+                "thermal coal", "energy")
+
+def pct(v, already_pct=False):
+    """Normalise a rate to a percentage, or None when not reported."""
+    if not isinstance(v, (int, float)):
+        return None
+    # yfinance returns some rates as fractions (0.0854) and some as percents.
+    return round(v if already_pct or v > 1 else v * 100, 2)
 
 
 def load_universe(path):
@@ -83,6 +112,15 @@ def looks_like_explorer(info):
     return False
 
 
+def is_resources_or_energy(info):
+    """Any miner, commodity producer or energy business — not just explorers."""
+    sector = (info.get("sector") or "").lower()
+    industry = (info.get("industry") or "").lower()
+    if sector in MINING_SECTORS:
+        return True
+    return any(h in industry for h in MINING_HINTS + ENERGY_HINTS)
+
+
 def is_pharma(info):
     text = ((info.get("industry") or "") + " " + (info.get("sector") or "")).lower()
     return any(h in text for h in PHARMA_HINTS)
@@ -110,7 +148,10 @@ def fetch(code):
         "pe": round(pe, 2) if isinstance(pe, (int, float)) else None,
         "cashFlowPositive": cash_flow_positive(info),
         "isPharma": is_pharma(info),
+        "dividendYield": pct(info.get("dividendYield")),
+        "payoutRatio": pct(info.get("payoutRatio")),
         "isMiningExploration": looks_like_explorer(info),
+        "isResourcesEnergy": is_resources_or_energy(info),
         "note": "",
     }
 
@@ -118,6 +159,7 @@ def fetch(code):
 def passes(s, pe_max):
     return (
         not s["isPharma"]
+        and not s["isResourcesEnergy"]
         and not s["isMiningExploration"]
         and s["cashFlowPositive"]
         and s["pe"] is not None
@@ -128,13 +170,16 @@ def passes(s, pe_max):
 def main():
     ap = argparse.ArgumentParser(description="Screen ASX shares for deep value.")
     ap.add_argument("--pe-max", type=float, default=10.0, help="Maximum trailing P/E (default 10)")
+    ap.add_argument("--include-resources", action="store_true",
+                    help="Keep mining, commodity and energy names in the results")
     ap.add_argument("--universe", help="File with one ASX code per line")
     ap.add_argument("--out", default=str(HERE / "data.json"), help="Output JSON path")
     args = ap.parse_args()
 
     codes = load_universe(args.universe)
+    excl = "ex-pharma" if args.include_resources else "ex-pharma, ex-mining/energy"
     print(f"Screening {len(codes)} ASX codes (P/E < {args.pe_max}, cash-flow "
-          f"positive, ex-pharma, ex-exploration)...\n", file=sys.stderr)
+          f"positive, {excl})...\n", file=sys.stderr)
 
     rows = []
     for i, code in enumerate(codes, 1):
@@ -147,7 +192,10 @@ def main():
             print(f"  [{i}/{len(codes)}] {code:5} skipped ({type(e).__name__})", file=sys.stderr)
         time.sleep(0.4)  # be gentle on the API
 
-    matches = sorted([r for r in rows if passes(r, args.pe_max)], key=lambda r: r["pe"])
+    keep = passes if not args.include_resources else (
+        lambda s, m: not s["isPharma"] and s["cashFlowPositive"]
+        and s["pe"] is not None and s["pe"] < m)
+    matches = sorted([r for r in rows if keep(r, args.pe_max)], key=lambda r: r["pe"])
 
     payload = {
         "meta": {
@@ -156,7 +204,8 @@ def main():
             "criteria": {
                 "peMax": args.pe_max,
                 "cashFlowPositive": True,
-                "excludeSectors": ["Pharmaceuticals", "Biotechnology", "Mining exploration"],
+                "excludeSectors": ["Pharmaceuticals", "Biotechnology",
+                                   "Mining & commodities", "Energy"],
             },
             "source": f"Live pull from Yahoo Finance via yfinance on {dt.date.today().isoformat()}.",
             "disclaimer": "General information only, not financial advice. Verify before acting.",
@@ -167,8 +216,12 @@ def main():
     Path(args.out).write_text(json.dumps(payload, indent=2))
 
     print(f"\n=== First {min(10, len(matches))} matches (of {len(matches)}) ===")
+    print(f"{'#':>2}  {'CODE':5} {'P/E':>5} {'YIELD':>6} {'PAYOUT':>7}  {'SECTOR':<22} NAME")
     for i, r in enumerate(matches[:10], 1):
-        print(f"{i:2}. {r['ticker']:5} P/E {r['pe']:>5}  {r['sector']:<22} {r['name']}")
+        y = f"{r['dividendYield']:.1f}%" if r["dividendYield"] is not None else "-"
+        po = f"{r['payoutRatio']:.0f}%" if r["payoutRatio"] is not None else "-"
+        print(f"{i:2}. {r['ticker']:5} {r['pe']:>5} {y:>6} {po:>7}  "
+              f"{r['sector']:<22} {r['name']}")
     print(f"\nWrote {args.out}")
 
 
