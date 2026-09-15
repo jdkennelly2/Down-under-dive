@@ -194,12 +194,19 @@
   .chip.sector{background:var(--surface-2);}
   .chip.cf{color:var(--pass);background:var(--pass-bg);border-color:transparent;}
   .chip.cf::before{content:"▲ ";font-size:9px;}
+  /* A warning is not a rejection — it marks a figure that needs the accounts
+     read before it can be trusted. */
+  .chip.flag{
+    color:var(--warn);background:var(--warn-bg);border-color:transparent;
+    font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;
+  }
+  .chip.flag::before{content:"! ";font-weight:700;}
   .cardnote{grid-column:1/4;font-size:12px;color:var(--muted);line-height:1.4;}
 
   /* dividend context — secondary to the screen, not a filter */
   .divs{
-    grid-column:1/4;display:flex;gap:18px;align-items:baseline;
-    padding-top:9px;border-top:1px dashed var(--hair);
+    grid-column:1/4;display:flex;flex-wrap:wrap;column-gap:18px;row-gap:10px;
+    align-items:baseline;padding-top:9px;border-top:1px dashed var(--hair);
   }
   .divs div{display:flex;flex-direction:column;gap:1px;}
   .divs dt{
@@ -275,14 +282,25 @@
   <section class="panel" aria-label="Screening criteria">
     <h2>Criteria</h2>
     <div class="ctl">
-      <label for="pe">Max P/E ratio<span class="hint">Trailing price ÷ earnings</span></label>
+      <label for="pe"><span id="valLabel">Max P/E ratio</span><span class="hint" id="valHint">Trailing price ÷ earnings</span></label>
       <output class="pe-val" id="peOut">&lt; 10.0</output>
     </div>
-    <input id="pe" type="range" min="4" max="20" step="0.5" value="10" aria-label="Maximum P/E ratio">
+    <input id="pe" type="range" min="3" max="20" step="0.5" value="10" aria-label="Maximum valuation multiple">
     <div class="ctl">
       <label for="cf">Cash-flow positive<span class="hint">Generates cash, not just accounting profit</span></label>
       <span class="switch"><input id="cf" type="checkbox" checked><span class="track"></span></span>
     </div>
+    <div class="ctl" id="rocCtl" hidden>
+      <label for="roc">Min return on capital<span class="hint">Owner's earnings ÷ tangible capital employed</span></label>
+      <output class="pe-val" id="rocOut">&ge; 0%</output>
+    </div>
+    <input id="roc" type="range" min="0" max="40" step="1" value="0" hidden
+           aria-label="Minimum return on tangible capital">
+    <div class="ctl" id="flagCtl" hidden>
+      <label for="fl">Hide flagged names<span class="hint">Lease, payables, margin or divergence warnings</span></label>
+      <span class="switch"><input id="fl" type="checkbox"><span class="track"></span></span>
+    </div>
+
     <h2 class="subhead">Exclude</h2>
     <div class="ctl">
       <label for="ph">Pharma &amp; biotech<span class="hint">Drug developers</span></label>
@@ -801,7 +819,40 @@
   const $ = s => document.querySelector(s);
   const listEl = $("#list"), exListEl = $("#exList"), exWrap = $("#exWrap");
   const peIn = $("#pe"), cfIn = $("#cf"), phIn = $("#ph"), mxIn = $("#mx"),
-        rtIn = $("#rt"), fmIn = $("#fm");
+        rtIn = $("#rt"), fmIn = $("#fm"), rocIn = $("#roc"), flIn = $("#fl");
+
+  // The dataset decides which valuation metric the app screens on. Once
+  // screener.py has run, EV/EBIT is present and leads; until then the app
+  // falls back to P/E rather than showing a column of em dashes.
+  let VAL = {key:"pe", label:"Max P/E ratio", hint:"Trailing price ÷ earnings",
+             short:"P/E", def:10};
+  const EV = {key:"evEbit", label:"Max EV/EBIT",
+              hint:"Enterprise value ÷ operating profit", short:"EV/EBIT", def:8};
+
+  // Reported where present, in the order they matter. Anything absent is
+  // simply not rendered — no placeholder rows.
+  const STATS = [
+    {k:"oeReturnOnCapital", label:"Ret. on capital"},
+    {k:"oeYieldCfo",        label:"OE yield"},
+    {k:"revenueCagr",       label:"Rev growth"},
+    {k:"grossMargin",       label:"Gross margin"},
+    {k:"dividendYield",     label:"Div yield"},
+    {k:"payoutRatio",       label:"Payout", strainAbove:100},
+  ];
+
+  // Each warning marks a specific way the headline figure misleads.
+  function flagsFor(s){
+    const f = [];
+    if(s.leaseHeavy)
+      f.push(["LEASE", "Lease payments are in neither owner's-earnings figure — both overstate"]);
+    if((s.wcFlattery ?? 0) > 25)
+      f.push(["PAYABLES", "Over a quarter of operating cash flow came from working capital, not trading"]);
+    if((s.grossMarginDelta ?? 0) < -1.5)
+      f.push(["GM-FALL", "Gross margin fell more than 1.5 points year on year"]);
+    if((s.oeDivergence ?? 0) > 0.4)
+      f.push(["DIVERGE", "The two owner's-earnings routes disagree by over 40%"]);
+    return f;
+  }
   let DATA = SEED;
 
   function classify(s, opts){
@@ -812,23 +863,37 @@
       return {pass:false, sev:"fail",
               why: s.isMiningExploration ? "Mining exploration" : "Mining / energy"};
     if(opts.cf && !s.cashFlowPositive) return {pass:false, sev:"fail", why:"Not cash-flow positive"};
-    if(s.pe === null) return {pass:false, sev:"fail", why:"No earnings (P/E n/a)"};
-    if(s.pe >= opts.pe){
-      const sev = s.pe < opts.pe + 1.5 ? "warn" : "fail";
-      return {pass:false, sev, why:"P/E " + s.pe.toFixed(1)};
+    if(opts.hideFlagged && flagsFor(s).length)
+      return {pass:false, sev:"warn", why:flagsFor(s).map(f=>f[0]).join(", ")};
+    if(opts.roc > 0){
+      const r = s.oeReturnOnCapital;
+      if(r === null || r === undefined || r < opts.roc)
+        return {pass:false, sev:"fail",
+                why: r == null ? "No return on capital" : "RoC " + r.toFixed(0) + "%"};
+    }
+    const v = s[VAL.key];
+    if(v === null || v === undefined)
+      return {pass:false, sev:"fail", why:"No " + VAL.short};
+    if(v >= opts.val){
+      const sev = v < opts.val + 1.5 ? "warn" : "fail";
+      return {pass:false, sev, why:VAL.short + " " + v.toFixed(1)};
     }
     return {pass:true};
   }
 
   function render(){
-    const opts = {pe:parseFloat(peIn.value), cf:cfIn.checked, ph:phIn.checked,
-                  mx:mxIn.checked, rt:rtIn.checked, fm:fmIn.checked};
-    $("#peOut").textContent = "< " + opts.pe.toFixed(1);
+    const opts = {val:parseFloat(peIn.value), cf:cfIn.checked, ph:phIn.checked,
+                  mx:mxIn.checked, rt:rtIn.checked, fm:fmIn.checked,
+                  roc:parseFloat(rocIn.value) || 0, hideFlagged:flIn.checked};
+    $("#peOut").textContent = "< " + opts.val.toFixed(1);
+    $("#rocOut").textContent = "\u2265 " + opts.roc.toFixed(0) + "%";
 
+    const key = VAL.key;
     const stocks = DATA.stocks.map(s => ({s, r:classify(s, opts)}));
-    const passes = stocks.filter(x => x.r.pass).sort((a,b)=>a.s.pe-b.s.pe);
+    const passes = stocks.filter(x => x.r.pass)
+                         .sort((a,b)=>(a.s[key]??999)-(b.s[key]??999));
     const fails  = stocks.filter(x => !x.r.pass)
-                         .sort((a,b)=>(a.s.pe??999)-(b.s.pe??999));
+                         .sort((a,b)=>(a.s[key]??999)-(b.s[key]??999));
     const shown = passes.slice(0,10);
 
     $("#matchN").textContent = passes.length;
@@ -841,7 +906,7 @@
     if(!shown.length){
       const li = document.createElement("li");
       li.className = "empty";
-      li.textContent = "Nothing clears these filters. Loosen the P/E ceiling or a toggle above.";
+      li.textContent = "Nothing clears these filters. Loosen the " + VAL.short + " ceiling or a toggle above.";
       listEl.append(li);
     }
     shown.forEach((x,i) => listEl.append(card(x.s, i+1)));
@@ -860,18 +925,26 @@
          <div class="ticker">${s.ticker} <span>ASX</span></div>
          <div class="name">${s.name}</div>
        </div>
-       <div class="pe"><b>${s.pe.toFixed(1)}</b><small>P/E</small></div>
+       <div class="pe"><b>${(s[VAL.key] ?? 0).toFixed(1)}</b><small>${VAL.short}</small></div>
        <div class="meta">
          <span class="chip sector">${s.sector}</span>
          <span class="chip">${s.industry}</span>
          <span class="chip cf">Cash-flow positive</span>
+         ${flagsFor(s).map(([f,why]) =>
+            `<span class="chip flag" title="${why}">${f}</span>`).join("")}
        </div>
        <div class="cardnote">${s.note}</div>
-       <dl class="divs">
-         <div><dt>Div yield</dt>${stat(s.dividendYield, "%")}</div>
-         <div><dt>Payout</dt>${stat(s.payoutRatio, "%", 100)}</div>
-       </dl>`;
+       ${statBlock(s)}`;
     return li;
+  }
+
+  // Only the figures this dataset actually carries. An empty block renders
+  // nothing at all rather than a row of dashes.
+  function statBlock(s){
+    const cells = STATS
+      .filter(c => s[c.k] !== null && s[c.k] !== undefined)
+      .map(c => `<div><dt>${c.label}</dt>${stat(s[c.k], "%", c.strainAbove)}</div>`);
+    return cells.length ? `<dl class="divs">${cells.join("")}</dl>` : "";
   }
 
   // Renders a figure, or an em dash when the source did not report one —
@@ -892,9 +965,24 @@
     return div;
   }
 
-  [peIn,cfIn,phIn,mxIn,rtIn,fmIn].forEach(el => el.addEventListener("input", render));
+  [peIn,cfIn,phIn,mxIn,rtIn,fmIn,rocIn,flIn].forEach(el => el.addEventListener("input", render));
 
-  const BUILD = "2026-09-10.10";
+  // Show the richer controls only once the data can answer them.
+  function configureForData(){
+    const has = k => DATA.stocks.some(s => s[k] !== null && s[k] !== undefined);
+    if(has("evEbit")) VAL = EV;
+    $("#valLabel").textContent = VAL.label;
+    $("#valHint").textContent = VAL.hint;
+    peIn.value = VAL.def;
+
+    const showRoc = has("oeReturnOnCapital");
+    $("#rocCtl").hidden = !showRoc;
+    rocIn.hidden = !showRoc;
+
+    $("#flagCtl").hidden = !DATA.stocks.some(s => flagsFor(s).length);
+  }
+
+  const BUILD = "2026-09-15.1";
 
   function reportMode(){
     const installed = matchMedia("(display-mode: standalone)").matches
@@ -918,6 +1006,7 @@
 
   function boot(){
     reportMode();
+    configureForData();
     $("#asOf").textContent = DATA.meta.asOf;
     $("#universeN").textContent = DATA.stocks.length;
     $("#srcNote").textContent = DATA.meta.source;
