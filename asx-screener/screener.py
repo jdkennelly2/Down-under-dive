@@ -137,6 +137,12 @@ LINES = {
              "Cash Cash Equivalents And Short Term Investments"),
     "lease_lt": ("Long Term Capital Lease Obligation",),
     "lease_st": ("Current Capital Lease Obligation",),
+    "revenue": ("Total Revenue", "Operating Revenue"),
+    "gross_profit": ("Gross Profit",),
+    "debt": ("Total Debt", "Total Debt Net"),
+    "payables": ("Payables", "Accounts Payable", "Payables And Accrued Expenses"),
+    "wc_payables": ("Change In Payable", "Change In Account Payable",
+                    "Changes In Account Receivables"),
 }
 
 
@@ -154,6 +160,55 @@ def line(df, key):
                 except Exception:
                     pass
     return None
+
+
+def series(df, key, n=4):
+    """Up to n most recent values for a line, newest first."""
+    if df is None or getattr(df, "empty", True):
+        return []
+    for alias in LINES[key]:
+        for label in df.index:
+            if str(label).strip().lower() == alias.lower():
+                try:
+                    v = df.loc[label].dropna()
+                    return [float(x) for x in v.iloc[:n]]
+                except Exception:
+                    pass
+    return []
+
+
+def gross_margin_trend(inc):
+    """Gross margin now and a year earlier. A thesis can survive a weak year
+    and not survive the gross line eroding — that is a different failure, and
+    it does not show up in the headline multiple."""
+    gp, rev = series(inc, "gross_profit", 2), series(inc, "revenue", 2)
+    if len(gp) < 1 or len(rev) < 1 or not rev[0]:
+        return None, None
+    now = round(100 * gp[0] / rev[0], 1)
+    prior = round(100 * gp[1] / rev[1], 1) if len(gp) > 1 and len(rev) > 1 and rev[1] else None
+    return now, (round(now - prior, 1) if prior is not None else None)
+
+
+def revenue_cagr(inc):
+    """Compound revenue growth across the available statement years."""
+    rev = series(inc, "revenue", 4)
+    if len(rev) < 2 or rev[-1] <= 0:
+        return None
+    years = len(rev) - 1
+    try:
+        return round(100 * ((rev[0] / rev[-1]) ** (1 / years) - 1), 1)
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
+def working_capital_flattery(cf):
+    """How much of operating cash flow came from working capital rather than
+    trading — stretching payables inflates CFO without earning anything. A
+    large positive share is the 'excess payables' tell."""
+    cfo, wc = line(cf, "cfo"), line(cf, "wc_change")
+    if cfo is None or wc is None or cfo <= 0:
+        return None
+    return round(100 * wc / cfo, 1)
 
 
 def owner_earnings(inc, cf, bs):
@@ -301,6 +356,16 @@ def fetch(code):
     oe_npat, oe_cfo, lease = owner_earnings(inc, cf, bs)
     nta, cash = tangible_equity(bs)
     npat = line(inc, "npat")
+    debt = line(bs, "debt") or info.get("totalDebt")
+
+    # Tangible capital employed: net tangible assets with cash taken out and
+    # debt added back, i.e. the capital the operating business actually uses.
+    # This is the denominator for "return on NTA adjusted for cash and debt".
+    tce = None
+    if nta is not None:
+        tce = nta - (cash or 0.0) + (debt or 0.0)
+
+    gm, gm_delta = gross_margin_trend(inc)
 
     # A wide gap between the two owner's-earnings routes means leases or
     # working capital are doing heavy lifting — read the accounts by hand.
@@ -332,8 +397,16 @@ def fetch(code):
         "leaseLiabilities": lease,
         "leaseHeavy": bool(lease and ev and lease / ev > 0.15),
         "nta": nta,
+        "tangibleCapitalEmployed": tce,
         "rote": pct(ratio(npat, nta)) if (nta and nta > 0) else None,
         "roteExCash": pct(ratio(npat, nta - cash)) if (nta and cash and nta - cash > 0) else None,
+        # The core quality test: cash earnings after capex against the
+        # tangible capital that produced them.
+        "oeReturnOnCapital": pct(ratio(oe_cfo, tce)) if (tce and tce > 0) else None,
+        "grossMargin": gm,
+        "grossMarginDelta": gm_delta,
+        "revenueCagr": revenue_cagr(inc),
+        "wcFlattery": working_capital_flattery(cf),
         "marketCap": mcap,
         "note": "",
     }
@@ -361,6 +434,11 @@ def main():
                     help="Maximum EV/EBIT (default 8)")
     ap.add_argument("--oe-yield-min", type=float, default=10.0,
                     help="Minimum owner's-earnings yield %%, CFO basis (default 10)")
+    ap.add_argument("--min-return-on-capital", type=float, default=None,
+                    help="Minimum owner's-earnings return on tangible capital %%. "
+                         "Off by default because the inputs are patchy on small "
+                         "caps and it would silently empty the screen; 15 is a "
+                         "sensible setting once you trust the data.")
     ap.add_argument("--pe-max", type=float, default=None,
                     help="Optional extra gate on trailing P/E (off by default)")
     ap.add_argument("--include-resources", action="store_true",
@@ -404,6 +482,10 @@ def main():
         cheap_yield = s["oeYieldCfo"] is not None and s["oeYieldCfo"] >= args.oe_yield_min
         if not (cheap_multiple or cheap_yield):
             return False
+        if args.min_return_on_capital is not None:
+            roc = s["oeReturnOnCapital"]
+            if roc is None or roc < args.min_return_on_capital:
+                return False
         if not args.include_resources and (s["isResourcesEnergy"] or s["isMiningExploration"]):
             return False
         if not args.include_reits and s["isREIT"]:
@@ -440,33 +522,51 @@ def main():
     def fmt(v, suffix="", dp=1):
         return f"{v:.{dp}f}{suffix}" if isinstance(v, (int, float)) else "-"
 
-    print(f"\n=== {min(15, len(matches))} of {len(matches)} matches ===")
-    print(f"{'#':>2}  {'CODE':5} {'EV/EBIT':>8} {'OE%cfo':>7} {'OE%pat':>7} "
-          f"{'ROTE':>6} {'DIV%':>5}  {'FLAGS':<12} NAME")
-    for i, r in enumerate(matches[:15], 1):
-        flags = []
+    def warnings_for(r):
+        """The two ways reported earnings get flattered, plus the thesis-breaker."""
+        w = []
         if r["leaseHeavy"]:
-            flags.append("LEASE")
+            w.append("LEASE")          # cash lease payments not in the figures
+        if (r["wcFlattery"] or 0) > 25:
+            w.append("PAYABLES")       # CFO propped up by working capital
+        if (r["grossMarginDelta"] or 0) < -1.5:
+            w.append("GM-FALL")        # gross line eroding
         if (r["oeDivergence"] or 0) > 0.4:
-            flags.append("DIVERGE")
-        print(f"{i:2}. {r['ticker']:5} {fmt(r['evEbit']):>8} "
-              f"{fmt(r['oeYieldCfo'],'%'):>7} {fmt(r['oeYieldNpat'],'%'):>7} "
-              f"{fmt(r['rote'],'%',0):>6} {fmt(r['dividendYield'],'%'):>5}  "
-              f"{','.join(flags) or '-':<12} {r['name']}")
+            w.append("DIVERGE")
+        return w
 
-    flagged = [r for r in matches[:15] if r["leaseHeavy"] or (r["oeDivergence"] or 0) > 0.4]
+    print(f"\n=== {min(15, len(matches))} of {len(matches)} matches ===")
+    print(f"{'#':>2}  {'CODE':5} {'EV/EBIT':>8} {'OE%cfo':>7} {'RoTC':>6} "
+          f"{'GM':>6} {'dGM':>6} {'REV%':>6}  {'WARNINGS':<22} NAME")
+    for i, r in enumerate(matches[:15], 1):
+        print(f"{i:2}. {r['ticker']:5} {fmt(r['evEbit']):>8} "
+              f"{fmt(r['oeYieldCfo'],'%'):>7} {fmt(r['oeReturnOnCapital'],'%',0):>6} "
+              f"{fmt(r['grossMargin'],'%',0):>6} {fmt(r['grossMarginDelta'],'',1):>6} "
+              f"{fmt(r['revenueCagr'],'%',0):>6}  "
+              f"{','.join(warnings_for(r)) or '-':<22} {r['name']}")
+
+    roc = [r["oeReturnOnCapital"] for r in matches if r["oeReturnOnCapital"] is not None]
+    if roc:
+        print(f"\nReturn on tangible capital: {sum(1 for x in roc if x >= 15)} of "
+              f"{len(roc)} priced names clear 15%. Re-run with "
+              f"--min-return-on-capital 15 to screen on it.")
+
+    flagged = [r for r in matches[:15] if warnings_for(r)]
     if flagged:
-        print("\nNeeds hand-finishing before the figures mean anything:")
-        print("  LEASE   lease liabilities are material. NEITHER owner's-earnings")
-        print("          figure subtracts cash lease payments, so both OVERSTATE.")
-        print("          Enter the lease line from the accounts yourself.")
-        print("  DIVERGE the two routes disagree on working capital or capex.")
+        print("\nWarnings — each marks a way the headline figure misleads:")
+        print("  LEASE     lease liabilities are material. NEITHER owner's-earnings")
+        print("            figure subtracts cash lease payments, so both OVERSTATE.")
+        print("            Enter the lease line from the accounts yourself.")
+        print("  PAYABLES  a large share of operating cash flow came from working")
+        print("            capital, not trading. Stretching creditors is not earnings.")
+        print("  GM-FALL   gross margin fell more than 1.5pts. A thesis survives a")
+        print("            weak year; it rarely survives the gross line eroding.")
+        print("  DIVERGE   the two owner's-earnings routes disagree by over 40%.")
         for r in flagged:
-            why = ",".join(f for f, on in (("LEASE", r["leaseHeavy"]),
-                                           ("DIVERGE", (r["oeDivergence"] or 0) > 0.4)) if on)
-            print(f"  {r['ticker']:5} {why:<14} OE(npat)={fmt(r['ownerEarningsNpat'],'',0):>14}"
-                  f"  OE(cfo)={fmt(r['ownerEarningsCfo'],'',0):>14}"
-                  f"  lease liab={fmt(r['leaseLiabilities'],'',0):>14}")
+            print(f"  {r['ticker']:5} {','.join(warnings_for(r)):<22} "
+                  f"OE(npat)={fmt(r['ownerEarningsNpat'],'',0):>13} "
+                  f"OE(cfo)={fmt(r['ownerEarningsCfo'],'',0):>13} "
+                  f"WC={fmt(r['wcFlattery'],'%',0):>6} dGM={fmt(r['grossMarginDelta'],'',1):>6}")
     print(f"\nWrote {args.out}")
 
 

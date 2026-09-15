@@ -53,12 +53,56 @@ genuine growth capex earns more than the screen shows.
 Neither gap is a bug to be fixed later. The screener's job is to narrow a few
 hundred names to a handful; the judgement happens after, by hand.
 
+## The quality test
+
+Cheapness is the entry ticket, not the thesis. The test that actually matters:
+
+```
+owner's earnings (cash flow after maintenance capex)
+------------------------------------------------------
+net tangible assets, adjusted for cash and debt
+```
+
+The denominator — **tangible capital employed** = NTA − cash + debt — is the
+capital the operating business genuinely uses. Reported as
+`oeReturnOnCapital`, and available as a gate via `--min-return-on-capital`.
+It is **off by default**: the inputs are patchy on small caps and an
+always-on gate would silently empty the screen rather than telling you why.
+The run prints how many names clear 15% so the effect is visible before you
+switch it on.
+
+On growth: moderate growth is preferred over high, partly because it attracts
+less attention. High growth is not disqualifying when the price is still
+reasonable. `revenueCagr` is reported rather than gated — the judgement is
+about price *relative* to growth, which is not a threshold.
+
+## Warnings
+
+Each flag marks a specific way a headline figure misleads. They come from
+post-mortems on real mistakes, not from theory:
+
+| Flag | What it catches |
+|------|-----------------|
+| `LEASE` | Lease liabilities material. Neither owner's-earnings figure subtracts cash lease payments, so both overstate — enter the lease line by hand |
+| `PAYABLES` | Over 25% of operating cash flow came from working capital rather than trading. Stretching creditors is not earnings |
+| `GM-FALL` | Gross margin fell more than 1.5pts. A thesis survives a weak year; it rarely survives the gross line eroding |
+| `DIVERGE` | The two owner's-earnings routes disagree by more than 40% |
+
+`LEASE` and `PAYABLES` exist because those two are the recurring reasons a
+cheap-looking business gets rejected. `GM-FALL` exists because a position can
+make money and still have been a mistake: if the gross line deteriorates, the
+thesis was wrong even when the outcome was positive.
+
 ## Quality metrics
 
 Also computed, as context rather than gates:
 
 - **NTA** — equity stripped of goodwill and intangibles
-- **ROTE** and **ROTE ex-cash** — return on tangible equity, the compounding test
+- **Tangible capital employed** — NTA less cash plus debt
+- **ROTE** and **ROTE ex-cash** — return on tangible equity
+- **Gross margin** and its year-on-year change
+- **Revenue CAGR** across the available statement years
+- **Working-capital share of operating cash flow**
 - **Lease liabilities** and enterprise value, so leverage is visible
 
 It ships with a **live screening engine** (`screener.py`) and a **mobile web
