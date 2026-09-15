@@ -13,6 +13,22 @@ Screens ASX-listed shares for:
   6. NOT a fund manager — asset managers specifically, not financials
      broadly, so banks, insurers and lenders still qualify.
 
+Valuation is driven by EV/EBIT and owner's earnings rather than P/E.
+Owner's earnings are computed two ways, because the two disagree and the
+disagreement is itself the signal:
+
+  NPAT method:  NPAT + D&A + impairments - increase in working capital - capex
+  CFO method:   cash from operations - lease payments - capex
+
+A lease-heavy business can look strongly cash generative on the first and
+barely break even on the second. Where they diverge, the accounts need
+reading by hand — the screener flags it rather than picking a winner.
+
+Two inputs genuinely cannot be automated and are left to manual work:
+splitting maintenance from growth capex, and isolating cash lease payments
+above what runs through the P&L. The screener narrows a few hundred names
+to a handful; the judgement happens after.
+
 Dividend yield and payout ratio are collected and reported for whatever
 passes, as extra context — they are not screening criteria.
 
@@ -69,6 +85,18 @@ DEFAULT_UNIVERSE = [
     # Resources & energy (kept so the exclusion is visible in the output)
     "ALD", "BHP", "EVN", "FMG", "IGO", "MIN", "NHC", "NST", "PLS", "RIO",
     "S32", "STO", "WDS", "WHC", "YAL",
+    # Small and micro caps. Deep value on the ASX mostly lives down here,
+    # not in the ASX 200 — a large-cap-only universe screens out the very
+    # part of the market this strategy hunts in.
+    "3PL", "ABB", "ACF", "ACU", "AMA", "ASG", "AX1", "BFG", "BRI", "CAT",
+    "CDA", "CIA", "CLG", "CSS", "CVL", "CWP", "DDR", "DRO", "DUR", "DVR",
+    "EGL", "EMC", "ENN", "EOL", "EQT", "EVS", "EZL", "FGR", "FWD", "GDG",
+    "GNG", "GTK", "HIT", "HLO", "HSN", "IMD", "IPD", "JAN", "JLG", "JYC",
+    "KME", "KSL", "LAU", "LBL", "LGP", "MAD", "MAH", "MDR", "MGH", "MP1",
+    "MXI", "NWH", "OCL", "PFP", "PGC", "PPE", "PPS", "PSI", "PTB", "PWH",
+    "RDX", "RFG", "RUL", "SDR", "SGI", "SHM", "SIQ", "SLC", "SNL", "SRG",
+    "SSG", "SSM", "SVR", "TEA", "TNE", "TOP", "TRS", "TWD", "VEE", "VNT",
+    "WGN", "WLL", "XRF", "ZNO",
 ]
 
 PHARMA_HINTS = ("drug", "pharmaceutic", "biotech", "medical device")
@@ -85,6 +113,88 @@ REIT_HINTS = ("reit", "real estate investment trust")
 # Asset managers specifically. Kept narrow so banks, insurers, lenders,
 # exchanges and leasing businesses are not swept up as "financials".
 FUND_MANAGER_HINTS = ("asset management", "fund manage", "investment manage")
+
+# Statement line items are labelled inconsistently across filings, so every
+# lookup tries a list of aliases and gives up cleanly rather than guessing.
+LINES = {
+    "npat": ("Net Income", "Net Income Common Stockholders",
+             "Net Income From Continuing Operation Net Minority Interest"),
+    "dand_a": ("Depreciation And Amortization", "Depreciation Amortization Depletion",
+               "Depreciation And Amortization In Income Statement", "Depreciation"),
+    "impairment": ("Impairment Of Capital Assets", "Asset Impairment Charge",
+                   "Impairment Of Intangibles", "Goodwill Impairment"),
+    "cfo": ("Operating Cash Flow", "Total Cash From Operating Activities",
+            "Cash Flow From Continuing Operating Activities"),
+    "capex": ("Capital Expenditure", "Purchase Of PPE", "Net PPE Purchase And Sale"),
+    "wc_change": ("Change In Working Capital", "Changes In Working Capital"),
+    "ebit": ("EBIT", "Operating Income", "Total Operating Income As Reported"),
+    "ebitda": ("EBITDA", "Normalized EBITDA"),
+    "equity": ("Stockholders Equity", "Total Equity Gross Minority Interest",
+               "Common Stock Equity"),
+    "goodwill": ("Goodwill",),
+    "intangibles": ("Other Intangible Assets", "Goodwill And Other Intangible Assets"),
+    "cash": ("Cash And Cash Equivalents",
+             "Cash Cash Equivalents And Short Term Investments"),
+    "lease_lt": ("Long Term Capital Lease Obligation",),
+    "lease_st": ("Current Capital Lease Obligation",),
+}
+
+
+def line(df, key):
+    """Most recent value for a statement line, or None when not reported."""
+    if df is None or getattr(df, "empty", True):
+        return None
+    for alias in LINES[key]:
+        for label in df.index:
+            if str(label).strip().lower() == alias.lower():
+                try:
+                    v = df.loc[label].dropna()
+                    if len(v):
+                        return float(v.iloc[0])
+                except Exception:
+                    pass
+    return None
+
+
+def owner_earnings(inc, cf, bs):
+    """Both routes to owner's earnings, plus the lease context needed to
+    judge them. Maintenance-vs-growth capex is not separable from the
+    filings, so total capex is used and the result is a floor, not a
+    target: a business with real growth capex earns more than this shows."""
+    npat = line(inc, "npat")
+    da = line(cf, "dand_a") or line(inc, "dand_a")
+    imp = line(cf, "impairment") or 0.0
+    wc = line(cf, "wc_change")          # negative when working capital grows
+    capex = line(cf, "capex")           # reported negative
+    cfo = line(cf, "cfo")
+
+    capex_out = abs(capex) if capex is not None else None
+    lease = sum(x for x in (line(bs, "lease_lt"), line(bs, "lease_st")) if x)
+
+    oe_npat = None
+    if None not in (npat, da) and capex_out is not None:
+        oe_npat = npat + da + imp + (wc or 0.0) - capex_out
+
+    # Neither route subtracts cash lease payments: the split between the P&L
+    # charge and actual cash out is not recoverable from filing-level data.
+    # For a lease-heavy business BOTH figures therefore overstate, and by the
+    # same amount — so oeDivergence will NOT catch it. leaseHeavy is the flag
+    # that matters there, and the lease line has to be entered by hand.
+    oe_cfo = None
+    if cfo is not None and capex_out is not None:
+        oe_cfo = cfo - capex_out
+
+    return oe_npat, oe_cfo, (lease or None)
+
+
+def tangible_equity(bs):
+    """Net tangible assets: equity stripped of goodwill and intangibles."""
+    eq = line(bs, "equity")
+    if eq is None:
+        return None, None
+    intang = (line(bs, "goodwill") or 0.0) + (line(bs, "intangibles") or 0.0)
+    return eq - intang, line(bs, "cash")
+
 
 def pct(v, already_pct=False):
     """Normalise a rate to a percentage, or None when not reported."""
@@ -159,12 +269,45 @@ def cash_flow_positive(info):
     return ocf is not None and ocf > 0
 
 
+def ratio(num, den):
+    """Guard every division: a zero or missing denominator yields None."""
+    if num is None or not den:
+        return None
+    try:
+        return round(num / den, 4)
+    except (TypeError, ZeroDivisionError):
+        return None
+
+
 def fetch(code):
     tkr = yf.Ticker(f"{code}.AX")
     info = tkr.info or {}
     if not info.get("shortName") and not info.get("longName"):
         return None
     pe = info.get("trailingPE")
+
+    try:
+        inc, cf, bs = tkr.income_stmt, tkr.cashflow, tkr.balance_sheet
+    except Exception:
+        inc = cf = bs = None
+
+    ev = info.get("enterpriseValue")
+    mcap = info.get("marketCap")
+    ebit = line(inc, "ebit")
+    if ebit is None and line(inc, "ebitda") is not None:
+        da = line(cf, "dand_a")
+        ebit = line(inc, "ebitda") - da if da is not None else None
+
+    oe_npat, oe_cfo, lease = owner_earnings(inc, cf, bs)
+    nta, cash = tangible_equity(bs)
+    npat = line(inc, "npat")
+
+    # A wide gap between the two owner's-earnings routes means leases or
+    # working capital are doing heavy lifting — read the accounts by hand.
+    divergence = None
+    if oe_npat and oe_cfo and max(abs(oe_npat), abs(oe_cfo)) > 0:
+        divergence = round(abs(oe_npat - oe_cfo) / max(abs(oe_npat), abs(oe_cfo)), 3)
+
     return {
         "ticker": code,
         "name": info.get("shortName") or info.get("longName") or code,
@@ -179,6 +322,19 @@ def fetch(code):
         "isResourcesEnergy": is_resources_or_energy(info),
         "isREIT": is_reit(info),
         "isFundManager": is_fund_manager(info),
+        # --- valuation on the owner's-earnings basis ---
+        "evEbit": ratio(ev, ebit) if (ev and ebit and ebit > 0) else None,
+        "ownerEarningsNpat": oe_npat,
+        "ownerEarningsCfo": oe_cfo,
+        "oeYieldNpat": pct(ratio(oe_npat, mcap)),
+        "oeYieldCfo": pct(ratio(oe_cfo, mcap)),
+        "oeDivergence": divergence,
+        "leaseLiabilities": lease,
+        "leaseHeavy": bool(lease and ev and lease / ev > 0.15),
+        "nta": nta,
+        "rote": pct(ratio(npat, nta)) if (nta and nta > 0) else None,
+        "roteExCash": pct(ratio(npat, nta - cash)) if (nta and cash and nta - cash > 0) else None,
+        "marketCap": mcap,
         "note": "",
     }
 
@@ -198,7 +354,15 @@ def passes(s, pe_max):
 
 def main():
     ap = argparse.ArgumentParser(description="Screen ASX shares for deep value.")
-    ap.add_argument("--pe-max", type=float, default=10.0, help="Maximum trailing P/E (default 10)")
+    # Defaults anchored on the NPV workbook's own buy cases, which sat at
+    # EV/EBIT 5-6 against a 10% cost of capital — so a 10% owner's-earnings
+    # yield is that same hurdle expressed as a yield.
+    ap.add_argument("--ev-ebit-max", type=float, default=8.0,
+                    help="Maximum EV/EBIT (default 8)")
+    ap.add_argument("--oe-yield-min", type=float, default=10.0,
+                    help="Minimum owner's-earnings yield %%, CFO basis (default 10)")
+    ap.add_argument("--pe-max", type=float, default=None,
+                    help="Optional extra gate on trailing P/E (off by default)")
     ap.add_argument("--include-resources", action="store_true",
                     help="Keep mining, commodity and energy names in the results")
     ap.add_argument("--include-reits", action="store_true",
@@ -214,8 +378,9 @@ def main():
                      + ([] if args.include_resources else ["ex-mining/energy"])
                      + ([] if args.include_reits else ["ex-REITs"])
                      + ([] if args.include_fund_managers else ["ex-fund-managers"]))
-    print(f"Screening {len(codes)} ASX codes (P/E < {args.pe_max}, cash-flow "
-          f"positive, {excl})...\n", file=sys.stderr)
+    gates = f"EV/EBIT < {args.ev_ebit_max} or OE yield >= {args.oe_yield_min}%"
+    print(f"Screening {len(codes)} ASX codes ({gates}, cash-flow positive, "
+          f"{excl})...\n", file=sys.stderr)
 
     rows = []
     for i, code in enumerate(codes, 1):
@@ -231,7 +396,13 @@ def main():
     def keep(s):
         if s["isPharma"] or not s["cashFlowPositive"]:
             return False
-        if s["pe"] is None or s["pe"] >= args.pe_max:
+        if args.pe_max is not None and (s["pe"] is None or s["pe"] >= args.pe_max):
+            return False
+        # Cheap on EV/EBIT *or* on owner's-earnings yield — either route in.
+        # Failing both is not value on this methodology.
+        cheap_multiple = s["evEbit"] is not None and s["evEbit"] < args.ev_ebit_max
+        cheap_yield = s["oeYieldCfo"] is not None and s["oeYieldCfo"] >= args.oe_yield_min
+        if not (cheap_multiple or cheap_yield):
             return False
         if not args.include_resources and (s["isResourcesEnergy"] or s["isMiningExploration"]):
             return False
@@ -241,13 +412,17 @@ def main():
             return False
         return True
 
-    matches = sorted([r for r in rows if keep(r)], key=lambda r: r["pe"])
+    # Cheapest on EV/EBIT first; names without one sort to the back.
+    matches = sorted([r for r in rows if keep(r)],
+                     key=lambda r: (r["evEbit"] is None, r["evEbit"] or 0))
 
     payload = {
         "meta": {
             "asOf": dt.date.today().isoformat(),
             "market": "ASX (Australian Securities Exchange)",
             "criteria": {
+                "evEbitMax": args.ev_ebit_max,
+                "oeYieldMin": args.oe_yield_min,
                 "peMax": args.pe_max,
                 "cashFlowPositive": True,
                 "excludeSectors": ["Pharmaceuticals", "Biotechnology",
@@ -262,13 +437,36 @@ def main():
     }
     Path(args.out).write_text(json.dumps(payload, indent=2))
 
-    print(f"\n=== First {min(10, len(matches))} matches (of {len(matches)}) ===")
-    print(f"{'#':>2}  {'CODE':5} {'P/E':>5} {'YIELD':>6} {'PAYOUT':>7}  {'SECTOR':<22} NAME")
-    for i, r in enumerate(matches[:10], 1):
-        y = f"{r['dividendYield']:.1f}%" if r["dividendYield"] is not None else "-"
-        po = f"{r['payoutRatio']:.0f}%" if r["payoutRatio"] is not None else "-"
-        print(f"{i:2}. {r['ticker']:5} {r['pe']:>5} {y:>6} {po:>7}  "
-              f"{r['sector']:<22} {r['name']}")
+    def fmt(v, suffix="", dp=1):
+        return f"{v:.{dp}f}{suffix}" if isinstance(v, (int, float)) else "-"
+
+    print(f"\n=== {min(15, len(matches))} of {len(matches)} matches ===")
+    print(f"{'#':>2}  {'CODE':5} {'EV/EBIT':>8} {'OE%cfo':>7} {'OE%pat':>7} "
+          f"{'ROTE':>6} {'DIV%':>5}  {'FLAGS':<12} NAME")
+    for i, r in enumerate(matches[:15], 1):
+        flags = []
+        if r["leaseHeavy"]:
+            flags.append("LEASE")
+        if (r["oeDivergence"] or 0) > 0.4:
+            flags.append("DIVERGE")
+        print(f"{i:2}. {r['ticker']:5} {fmt(r['evEbit']):>8} "
+              f"{fmt(r['oeYieldCfo'],'%'):>7} {fmt(r['oeYieldNpat'],'%'):>7} "
+              f"{fmt(r['rote'],'%',0):>6} {fmt(r['dividendYield'],'%'):>5}  "
+              f"{','.join(flags) or '-':<12} {r['name']}")
+
+    flagged = [r for r in matches[:15] if r["leaseHeavy"] or (r["oeDivergence"] or 0) > 0.4]
+    if flagged:
+        print("\nNeeds hand-finishing before the figures mean anything:")
+        print("  LEASE   lease liabilities are material. NEITHER owner's-earnings")
+        print("          figure subtracts cash lease payments, so both OVERSTATE.")
+        print("          Enter the lease line from the accounts yourself.")
+        print("  DIVERGE the two routes disagree on working capital or capex.")
+        for r in flagged:
+            why = ",".join(f for f, on in (("LEASE", r["leaseHeavy"]),
+                                           ("DIVERGE", (r["oeDivergence"] or 0) > 0.4)) if on)
+            print(f"  {r['ticker']:5} {why:<14} OE(npat)={fmt(r['ownerEarningsNpat'],'',0):>14}"
+                  f"  OE(cfo)={fmt(r['ownerEarningsCfo'],'',0):>14}"
+                  f"  lease liab={fmt(r['leaseLiabilities'],'',0):>14}")
     print(f"\nWrote {args.out}")
 
 

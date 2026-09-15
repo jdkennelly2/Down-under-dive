@@ -2,7 +2,8 @@
 
 A small mobile-first app that screens **Australian (ASX) shares** for:
 
-1. **Price-to-earnings ratio under 10**
+1. **Cheap on owner's earnings** — `EV/EBIT` below 8, **or** an owner's-earnings
+   yield of 10%+ . Either route in; failing both is not value on this method
 2. **Cash-flow positive** (free cash flow > 0, else operating cash flow > 0)
 3. **Not pharmaceutical / biotech**
 4. **Not mining, commodities or energy** — producers and explorers alike
@@ -15,6 +16,50 @@ A small mobile-first app that screens **Australian (ASX) shares** for:
 **Dividend yield** and **payout ratio** are shown for everything that passes, as
 extra context rather than screening criteria. A payout ratio above 100% is
 flagged: the dividend exceeds earnings and may not be sustainable.
+
+P/E is no longer a gate — it is a crude proxy for what this actually measures,
+and it is wrong in exactly the places that matter (leases, impairments,
+intangibles). It remains available as an optional extra filter via `--pe-max`.
+
+## Owner's earnings
+
+The screener computes owner's earnings two ways, because the two disagree and
+**the disagreement is the signal**:
+
+```
+NPAT route:  NPAT + D&A + impairments - increase in working capital - capex
+CFO route:   cash from operations - capex
+```
+
+A capital-light business lands in much the same place on both. A lease-heavy or
+working-capital-hungry one does not, and the gap is where the accounts need
+reading. Two flags mark that:
+
+| Flag | Meaning |
+|------|---------|
+| `DIVERGE` | The routes disagree by more than 40% — working capital or capex is doing the work |
+| `LEASE` | Lease liabilities exceed 15% of enterprise value |
+
+**A deliberate limitation, stated plainly.** Neither route subtracts cash lease
+payments, because the split between the P&L charge and actual cash out is not
+recoverable from filing-level data. For a lease-heavy business **both figures
+overstate**, and by the same amount — so `DIVERGE` will *not* catch it. That is
+what `LEASE` is for, and the lease line has to be entered by hand.
+
+Maintenance-versus-growth capex is the same kind of problem: total capex is
+used, which makes the result a **floor** rather than a target. A business with
+genuine growth capex earns more than the screen shows.
+
+Neither gap is a bug to be fixed later. The screener's job is to narrow a few
+hundred names to a handful; the judgement happens after, by hand.
+
+## Quality metrics
+
+Also computed, as context rather than gates:
+
+- **NTA** — equity stripped of goodwill and intangibles
+- **ROTE** and **ROTE ex-cash** — return on tangible equity, the compounding test
+- **Lease liabilities** and enterprise value, so leverage is visible
 
 It ships with a **live screening engine** (`screener.py`) and a **mobile web
 app** (`app.html`) that presents the results and lets you adjust the filters.
@@ -160,8 +205,10 @@ or CI networks block it):
 
 ```bash
 pip install yfinance
-python screener.py                 # default ASX universe, P/E < 10
-python screener.py --pe-max 12     # widen the multiple
+python screener.py                      # EV/EBIT < 8 or OE yield >= 10%
+python screener.py --ev-ebit-max 6      # tighten the multiple
+python screener.py --oe-yield-min 12    # demand a higher owner's-earnings yield
+python screener.py --pe-max 12          # add a P/E gate on top
 python screener.py --universe my_codes.txt   # one ASX code per line, e.g. "BHP"
 ```
 
