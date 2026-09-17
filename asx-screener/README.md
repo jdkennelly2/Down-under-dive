@@ -76,6 +76,31 @@ less attention. High growth is not disqualifying when the price is still
 reasonable. `revenueCagr` is reported rather than gated — the judgement is
 about price *relative* to growth, which is not a threshold.
 
+## When a metric comes back empty
+
+The run reports coverage — how many names resolved EV/EBIT and owner's
+earnings. If owner's earnings resolves for far fewer, the cause is usually an
+alias: the provider calls a line something the lookup table does not expect.
+Find out what it is actually called:
+
+```powershell
+py screener.py --labels ACU
+```
+
+That prints every row label on the income statement, cash flow and balance
+sheet for one company, then shows which of the lookups currently resolve and
+which come back MISSING. Add the real label to `LINES` in `screener.py`.
+
+Two notes on figures the screen will not show:
+
+- **EV/EBIT is omitted when enterprise value is negative.** A business holding
+  more cash than its market capitalisation has negative EV, which makes the
+  ratio negative and sorts it to the top as the cheapest name on the market.
+  It is not cheap; the ratio is meaningless there.
+- **Gross margin is omitted when it computes to 100%.** Some filers report no
+  cost-of-sales line, so "gross profit" equals revenue. That is missing data,
+  not a fat margin.
+
 ## Warnings
 
 Each flag marks a specific way a headline figure misleads. They come from

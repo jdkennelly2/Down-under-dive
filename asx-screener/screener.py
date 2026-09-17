@@ -139,7 +139,11 @@ LINES = {
     "impairment": ("Impairment Of Capital Assets", "Asset Impairment Charge",
                    "Impairment Of Intangibles", "Goodwill Impairment"),
     "cfo": ("Operating Cash Flow", "Total Cash From Operating Activities",
-            "Cash Flow From Continuing Operating Activities"),
+            "Cash Flow From Continuing Operating Activities",
+            "Net Cash Provided By Operating Activities",
+            "Net Cash Provided By Used In Operating Activities",
+            "Cash Flows From Used In Operating Activities Direct",
+            "Cash Generated From Operating Activities"),
     "capex": ("Capital Expenditure", "Purchase Of PPE", "Net PPE Purchase And Sale"),
     "wc_change": ("Change In Working Capital", "Changes In Working Capital"),
     "ebit": ("EBIT", "Operating Income", "Total Operating Income As Reported"),
@@ -161,19 +165,51 @@ LINES = {
 }
 
 
+# Where an exact alias misses, a token test can still identify the line
+# safely. Declared only for the two items whose absence breaks the whole
+# method, and each carries forbidden tokens so it cannot grab a neighbour
+# (an investing or financing subtotal, or the working-capital movement).
+FALLBACK = {
+    "cfo":   (("operating", "cash"), ("investing", "financing", "workingcapital")),
+    "capex": (("capital", "expenditure"), ("depreciation",)),
+}
+
+
+def _norm(s):
+    return "".join(ch for ch in str(s).lower() if ch.isalnum())
+
+
+def _value(df, label):
+    try:
+        v = df.loc[label].dropna()
+        return float(v.iloc[0]) if len(v) else None
+    except Exception:
+        return None
+
+
 def line(df, key):
     """Most recent value for a statement line, or None when not reported."""
     if df is None or getattr(df, "empty", True):
         return None
+    labels = list(df.index)
+    norm = {lbl: _norm(lbl) for lbl in labels}
+
     for alias in LINES[key]:
-        for label in df.index:
-            if str(label).strip().lower() == alias.lower():
-                try:
-                    v = df.loc[label].dropna()
-                    if len(v):
-                        return float(v.iloc[0])
-                except Exception:
-                    pass
+        want = _norm(alias)
+        for lbl in labels:
+            if norm[lbl] == want:
+                v = _value(df, lbl)
+                if v is not None:
+                    return v
+
+    required, forbidden = FALLBACK.get(key, ((), ()))
+    if required:
+        for lbl in labels:
+            n = norm[lbl]
+            if all(tok in n for tok in required) and not any(f in n for f in forbidden):
+                v = _value(df, lbl)
+                if v is not None:
+                    return v
     return None
 
 
@@ -198,6 +234,11 @@ def gross_margin_trend(inc):
     it does not show up in the headline multiple."""
     gp, rev = series(inc, "gross_profit", 2), series(inc, "revenue", 2)
     if len(gp) < 1 or len(rev) < 1 or not rev[0]:
+        return None, None
+    # Some filers report no cost-of-sales line, so "gross profit" simply
+    # equals revenue and the margin computes to 100%. That is an absence of
+    # data, not a fat margin — report nothing rather than something false.
+    if gp[0] >= rev[0] * 0.995:
         return None, None
     now = round(100 * gp[0] / rev[0], 1)
     prior = round(100 * gp[1] / rev[1], 1) if len(gp) > 1 and len(rev) > 1 and rev[1] else None
@@ -274,15 +315,26 @@ def pct(v, already_pct=False):
     return round(v if already_pct or v > 1 else v * 100, 2)
 
 
+def dedupe(codes):
+    """Preserve order, drop repeats — a duplicate costs a network round trip
+    and shows up twice in the results."""
+    seen, out = set(), []
+    for c in codes:
+        if c not in seen:
+            seen.add(c)
+            out.append(c)
+    return out
+
+
 def load_universe(path):
     if not path:
-        return DEFAULT_UNIVERSE
+        return dedupe(DEFAULT_UNIVERSE)
     codes = []
     for line in Path(path).read_text().splitlines():
         c = line.strip().upper().replace(".AX", "")
         if c and not c.startswith("#"):
             codes.append(c)
-    return codes
+    return dedupe(codes)
 
 
 def looks_like_explorer(info):
@@ -403,7 +455,10 @@ def fetch(code):
         "isREIT": is_reit(info),
         "isFundManager": is_fund_manager(info),
         # --- valuation on the owner's-earnings basis ---
-        "evEbit": ratio(ev, ebit) if (ev and ebit and ebit > 0) else None,
+        # A net-cash business can have negative enterprise value, which makes
+        # EV/EBIT negative and sorts it to the top as the "cheapest" name in
+        # the market. It is not cheap, the ratio is simply meaningless here.
+        "evEbit": ratio(ev, ebit) if (ev and ev > 0 and ebit and ebit > 0) else None,
         "ownerEarningsNpat": oe_npat,
         "ownerEarningsCfo": oe_cfo,
         "oeYieldNpat": pct(ratio(oe_npat, mcap)),
@@ -438,6 +493,33 @@ def passes(s, pe_max):
         and s["pe"] is not None
         and s["pe"] < pe_max
     )
+
+
+def dump_labels(code):
+    """Show what the provider actually calls each line, and which of our
+    lookups currently resolve. Aliases are guesswork until seen against
+    real data; this is how the guesswork gets corrected."""
+    tkr = yf.Ticker(f"{code}.AX")
+    for name, df in (("INCOME STATEMENT", tkr.income_stmt),
+                     ("CASH FLOW", tkr.cashflow),
+                     ("BALANCE SHEET", tkr.balance_sheet)):
+        print(f"\n=== {name} ({code}) ===")
+        if df is None or getattr(df, "empty", True):
+            print("  (empty — the provider returned nothing)")
+            continue
+        for lbl in df.index:
+            print(f"  {lbl}")
+
+    print(f"\n=== what our lookups resolve for {code} ===")
+    inc, cf, bs = tkr.income_stmt, tkr.cashflow, tkr.balance_sheet
+    for key, df, where in (("npat", inc, "income"), ("ebit", inc, "income"),
+                           ("revenue", inc, "income"), ("gross_profit", inc, "income"),
+                           ("cfo", cf, "cashflow"), ("capex", cf, "cashflow"),
+                           ("dand_a", cf, "cashflow"), ("wc_change", cf, "cashflow"),
+                           ("equity", bs, "balance"), ("goodwill", bs, "balance"),
+                           ("cash", bs, "balance"), ("debt", bs, "balance")):
+        v = line(df, key)
+        print(f"  {key:14} [{where:8}] {'MISSING' if v is None else format(v, ',.0f')}")
 
 
 def preflight():
@@ -493,11 +575,21 @@ def main():
                     help="Keep property trusts in the results")
     ap.add_argument("--include-fund-managers", action="store_true",
                     help="Keep asset managers in the results")
+    ap.add_argument("--labels", metavar="CODE",
+                    help="Print the actual statement row labels for one ASX "
+                         "code and exit. Use this when a metric comes back "
+                         "empty: it shows what the data provider calls the "
+                         "line, so the alias can be corrected.")
     ap.add_argument("--universe", help="File with one ASX code per line")
     ap.add_argument("--out", default=str(HERE / "data.json"), help="Output JSON path")
     args = ap.parse_args()
 
     preflight()
+
+    if args.labels:
+        dump_labels(args.labels.upper().replace(".AX", ""))
+        return
+
     codes = load_universe(args.universe)
     excl = ", ".join(["ex-pharma"]
                      + ([] if args.include_resources else ["ex-mining/energy"])
