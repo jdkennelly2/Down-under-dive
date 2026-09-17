@@ -389,7 +389,7 @@ def load_universe(path):
     if not path:
         return dedupe(DEFAULT_UNIVERSE)
     codes = []
-    for line in Path(path).read_text().splitlines():
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
         c = line.strip().upper().replace(".AX", "")
         if c and not c.startswith("#"):
             codes.append(c)
@@ -776,7 +776,7 @@ def main():
         # Keep passers first (ranked), then the rest so the app can show near-misses.
         "stocks": matches + [r for r in rows if r not in matches],
     }
-    Path(args.out).write_text(json.dumps(payload, indent=2))
+    Path(args.out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     def fmt(v, suffix="", dp=1):
         return f"{v:.{dp}f}{suffix}" if isinstance(v, (int, float)) else "-"

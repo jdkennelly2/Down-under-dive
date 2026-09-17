@@ -20,7 +20,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE.parent / "docs"
-src = (HERE / "app.html").read_text()
+src = (HERE / "app.html").read_text(encoding="utf-8")
 
 # app.html holds <title>/<style>/<link> first, then the page body.
 SPLIT = '<div class="wrap">'
@@ -86,10 +86,12 @@ SW = """
 """
 
 OUT.mkdir(exist_ok=True)
-(OUT / "index.html").write_text(HEAD + head_src.strip() + RESET_AND_IOS + body_src.rstrip() + SW)
+(OUT / "index.html").write_text(
+    HEAD + head_src.strip() + RESET_AND_IOS + body_src.rstrip() + SW,
+    encoding="utf-8")
 
 # Serve the files as-is (no Jekyll processing).
-(OUT / ".nojekyll").write_text("")
+(OUT / ".nojekyll").write_text("", encoding="utf-8")
 
 ASSETS = ["data.json", "manifest.webmanifest", "sw.js", "apple-touch-icon.png",
           "icon-192.png", "icon-512.png", "icon-1024.png"]
