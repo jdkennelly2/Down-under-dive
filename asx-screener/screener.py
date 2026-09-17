@@ -429,6 +429,37 @@ def passes(s, pe_max):
     )
 
 
+def preflight():
+    """Report the environment and whether it can actually do the job.
+
+    An old yfinance may not expose company statements at all. fetch() catches
+    that and carries on with None, which would quietly produce a screen with
+    no owner's earnings, no EV/EBIT and no return on capital — and no clue
+    why. Better to say so up front."""
+    import platform
+    ver = getattr(yf, "__version__", "unknown")
+    print(f"Python {platform.python_version()} · yfinance {ver}", file=sys.stderr)
+
+    ok = True
+    if sys.version_info < (3, 9):
+        ok = False
+        print("  ! Python 3.8 reached end of life in October 2024. pip can only\n"
+              "    install an old yfinance for it, which may not provide company\n"
+              "    statements. Install Python 3.12 from python.org (tick 'Add\n"
+              "    Python to PATH'), then re-run: py -m pip install -U yfinance",
+              file=sys.stderr)
+
+    missing = [a for a in ("income_stmt", "cashflow", "balance_sheet")
+               if not hasattr(yf.Ticker, a)]
+    if missing:
+        ok = False
+        print(f"  ! This yfinance does not expose: {', '.join(missing)}.\n"
+              "    Owner's earnings, EV/EBIT and return on capital cannot be\n"
+              "    computed — the screen would fall back to P/E only.",
+              file=sys.stderr)
+    return ok
+
+
 def main():
     ap = argparse.ArgumentParser(description="Screen ASX shares for deep value.")
     # Defaults anchored on the NPV workbook's own buy cases, which sat at
@@ -455,6 +486,7 @@ def main():
     ap.add_argument("--out", default=str(HERE / "data.json"), help="Output JSON path")
     args = ap.parse_args()
 
+    preflight()
     codes = load_universe(args.universe)
     excl = ", ".join(["ex-pharma"]
                      + ([] if args.include_resources else ["ex-mining/energy"])
@@ -497,6 +529,15 @@ def main():
         if not args.include_fund_managers and s["isFundManager"]:
             return False
         return True
+
+    priced = sum(1 for r in rows if r["evEbit"] is not None)
+    withoe = sum(1 for r in rows if r["oeYieldCfo"] is not None)
+    print(f"\nStatements resolved: EV/EBIT for {priced}/{len(rows)}, "
+          f"owner's earnings for {withoe}/{len(rows)}.", file=sys.stderr)
+    if rows and priced == 0 and withoe == 0:
+        print("  ! None resolved. Every owner's-earnings metric will be empty and\n"
+              "    the app will fall back to showing P/E. This is almost always an\n"
+              "    out-of-date yfinance — see the warnings above.", file=sys.stderr)
 
     # Cheapest on EV/EBIT first; names without one sort to the back.
     matches = sorted([r for r in rows if keep(r)],

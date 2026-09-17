@@ -242,6 +242,32 @@ it is cash-flow positive with a comfortable 34% payout. It fails on one thing
 only: a P/E of ~14.4. If it belongs in the screen, the P/E ceiling is the
 setting to revisit, not the sector rules.
 
+## First-time setup
+
+The screener runs on your own machine, because Yahoo Finance is unreachable
+from many managed networks. You need the repository locally first:
+
+```powershell
+cd $HOME
+git clone https://github.com/jdkennelly2/Down-under-dive.git
+cd Down-under-dive
+git checkout claude/au-stock-screener-app-vssrdu
+cd asx-screener
+```
+
+After that first clone, updating is just `git pull` from inside the folder.
+
+**Python 3.9 or newer is required** — 3.12 recommended. On Python 3.8 (end of
+life since October 2024) pip can only resolve an old `yfinance` that may not
+expose company statements, and every owner's-earnings metric comes back empty.
+`screener.py` checks this on startup and says so rather than producing a hollow
+screen. Get Python from python.org and tick **"Add Python to PATH"**.
+
+```powershell
+py --version          # expect 3.9+
+py -m pip install -U yfinance
+```
+
 ## Run the live screener
 
 Run this on a machine/phone where `finance.yahoo.com` is reachable (some managed
