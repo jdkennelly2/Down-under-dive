@@ -139,8 +139,11 @@ FUND_MANAGER_HINTS = ("asset management", "fund manage", "investment manage",
 LINES = {
     "npat": ("Net Income", "Net Income Common Stockholders",
              "Net Income From Continuing Operation Net Minority Interest"),
-    "dand_a": ("Depreciation And Amortization", "Depreciation Amortization Depletion",
-               "Depreciation And Amortization In Income Statement", "Depreciation"),
+    "dand_a": ("Depreciation And Amortization", "Reconciled Depreciation",
+               "Depreciation Amortization Depletion",
+               "Depreciation And Amortization In Income Statement",
+               "Depreciation Amortization Depletion Income Statement",
+               "Depreciation Income Statement", "Depreciation"),
     "impairment": ("Impairment Of Capital Assets", "Asset Impairment Charge",
                    "Impairment Of Intangibles", "Goodwill Impairment"),
     "cfo": ("Operating Cash Flow", "Total Cash From Operating Activities",
@@ -165,8 +168,13 @@ LINES = {
     "gross_profit": ("Gross Profit",),
     "debt": ("Total Debt", "Total Debt Net"),
     "payables": ("Payables", "Accounts Payable", "Payables And Accrued Expenses"),
-    "liabilities": ("Total Liabilities Net Minority Interest", "Total Liabilities",
-                    "Total Liabilities And Stockholders Equity"),
+    "liabilities": ("Total Liabilities Net Minority Interest", "Total Liabilities"),
+    # The provider computes several of these itself. Its figure beats our
+    # reconstruction: it knows what it classified as intangible or as debt.
+    "nta_direct": ("Net Tangible Assets", "Tangible Book Value"),
+    "net_debt": ("Net Debt",),
+    "working_capital": ("Working Capital",),
+    "lease_total": ("Capital Lease Obligations",),
     "wc_payables": ("Change In Payable", "Change In Account Payable",
                     "Changes In Account Receivables"),
 }
@@ -272,6 +280,24 @@ def working_capital_flattery(cf):
     return round(100 * wc / cfo, 1)
 
 
+def working_capital_change(cf, bs):
+    """The cash effect of working capital moving.
+
+    An indirect-method cash flow statement reconciles it explicitly. A
+    DIRECT-method one does not — it reports receipts from customers and
+    payments to suppliers instead, and carries no such line at all. Where
+    that happens, derive the movement from two balance sheets: working
+    capital growing consumes cash, so the effect is the negative of the
+    increase."""
+    direct = line(cf, "wc_change")
+    if direct is not None:
+        return direct                      # already signed as a cash effect
+    wc = series(bs, "working_capital", 2)
+    if len(wc) < 2:
+        return None
+    return -(wc[0] - wc[1])
+
+
 def owner_earnings(inc, cf, bs):
     """Both routes to owner's earnings, plus the lease context needed to
     judge them. Maintenance-vs-growth capex is not separable from the
@@ -280,12 +306,15 @@ def owner_earnings(inc, cf, bs):
     npat = line(inc, "npat")
     da = line(cf, "dand_a") or line(inc, "dand_a")
     imp = line(cf, "impairment") or 0.0
-    wc = line(cf, "wc_change")          # negative when working capital grows
+    wc = working_capital_change(cf, bs)  # negative when working capital grows
     capex = line(cf, "capex")           # reported negative
     cfo = line(cf, "cfo")
 
     capex_out = abs(capex) if capex is not None else None
-    lease = sum(x for x in (line(bs, "lease_lt"), line(bs, "lease_st")) if x)
+    # Prefer the provider's own lease total; fall back to summing the halves.
+    lease = line(bs, "lease_total")
+    if lease is None:
+        lease = sum(x for x in (line(bs, "lease_lt"), line(bs, "lease_st")) if x)
 
     oe_npat = None
     if None not in (npat, da) and capex_out is not None:
@@ -304,7 +333,14 @@ def owner_earnings(inc, cf, bs):
 
 
 def tangible_equity(bs):
-    """Net tangible assets: equity stripped of goodwill and intangibles."""
+    """Net tangible assets, and cash.
+
+    Uses the provider's own Net Tangible Assets where given — it knows what
+    it classified as intangible, which a subtraction here only guesses at.
+    Falls back to equity less goodwill and other intangibles."""
+    direct = line(bs, "nta_direct")
+    if direct is not None:
+        return direct, line(bs, "cash")
     eq = line(bs, "equity")
     if eq is None:
         return None, None
@@ -468,6 +504,9 @@ def fetch(code):
     #   net of all debts= cash - total liabilities   (the stricter view)
     liabilities = line(bs, "liabilities")
     net_cash = (cash - debt) if (cash is not None and debt is not None) else None
+    if net_cash is None:
+        nd = line(bs, "net_debt")        # provider reports debt LESS cash
+        net_cash = -nd if nd is not None else None
     net_of_all = (cash - liabilities) if (cash is not None and liabilities is not None) else None
 
     # A wide gap between the two owner's-earnings routes means leases or
@@ -558,11 +597,22 @@ def dump_labels(code):
     for key, df, where in (("npat", inc, "income"), ("ebit", inc, "income"),
                            ("revenue", inc, "income"), ("gross_profit", inc, "income"),
                            ("cfo", cf, "cashflow"), ("capex", cf, "cashflow"),
-                           ("dand_a", cf, "cashflow"), ("wc_change", cf, "cashflow"),
-                           ("equity", bs, "balance"), ("goodwill", bs, "balance"),
-                           ("cash", bs, "balance"), ("debt", bs, "balance")):
+                           ("equity", bs, "balance"), ("nta_direct", bs, "balance"),
+                           ("goodwill", bs, "balance"), ("cash", bs, "balance"),
+                           ("debt", bs, "balance"), ("net_debt", bs, "balance"),
+                           ("liabilities", bs, "balance"),
+                           ("working_capital", bs, "balance"),
+                           ("lease_total", bs, "balance")):
         v = line(df, key)
-        print(f"  {key:14} [{where:8}] {'MISSING' if v is None else format(v, ',.0f')}")
+        print(f"  {key:16} [{where:8}] {'MISSING' if v is None else format(v, ',.0f')}")
+
+    # These two look in more than one place, so report what the code finds.
+    da = line(cf, "dand_a") or line(inc, "dand_a")
+    print(f"  {'dand_a':16} [cf or inc] {'MISSING' if da is None else format(da, ',.0f')}")
+    wc = working_capital_change(cf, bs)
+    print(f"  {'wc_change':16} [cf or bs ] {'MISSING' if wc is None else format(wc, ',.0f')}"
+          "   (direct-method statements carry no such line; derived from two "
+          "balance sheets instead)")
 
 
 def preflight():

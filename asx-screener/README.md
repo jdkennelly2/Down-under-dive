@@ -94,6 +94,21 @@ That prints every row label on the income statement, cash flow and balance
 sheet for one company, then shows which of the lookups currently resolve and
 which come back MISSING. Add the real label to `LINES` in `screener.py`.
 
+Two things that diagnostic taught this screener, both worth knowing:
+
+**Direct-method cash flow statements carry no working-capital line.** They
+report receipts from customers and payments to suppliers instead of
+reconciling profit to cash, so there is nothing called "Change In Working
+Capital" to find. Where it is absent the movement is derived from two
+balance sheets — working capital growing consumes cash, so the effect is the
+negative of the increase.
+
+**The provider computes some figures itself, and its version wins.** `Net
+Tangible Assets`, `Net Debt`, `Working Capital` and `Capital Lease
+Obligations` are all reported directly. It knows what it classified as
+intangible or as debt; subtracting line items here only guesses at the same
+answer. The reconstructions remain as fallbacks.
+
 **On EV/EBIT and negative enterprise value.** The *ratio* is omitted when EV
 is negative, because it is not meaningful — but the *company* is not. A
 business holding more net cash than its market capitalisation is close to
