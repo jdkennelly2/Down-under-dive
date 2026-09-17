@@ -59,7 +59,14 @@ from pathlib import Path
 try:
     import yfinance as yf
 except ImportError:
-    sys.exit("Missing dependency. Run:  pip install yfinance")
+    # Common trap: a second Python is installed later, and `py` now launches
+    # that one while yfinance sits in the older interpreter's site-packages.
+    # `py -m pip` installs into whichever Python `py` currently resolves to.
+    sys.exit("yfinance is not installed for this Python "
+             f"({sys.version.split()[0]}).\n"
+             "Install it for THIS interpreter:  py -m pip install -U yfinance\n"
+             "(If you recently installed a newer Python, packages added before "
+             "that belong to the old one and must be reinstalled.)")
 
 HERE = Path(__file__).resolve().parent
 
