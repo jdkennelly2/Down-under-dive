@@ -247,14 +247,19 @@ setting to revisit, not the sector rules.
 Run this on a machine/phone where `finance.yahoo.com` is reachable (some managed
 or CI networks block it):
 
-```bash
-pip install yfinance
-python screener.py                      # EV/EBIT < 8 or OE yield >= 10%
-python screener.py --ev-ebit-max 6      # tighten the multiple
-python screener.py --oe-yield-min 12    # demand a higher owner's-earnings yield
-python screener.py --pe-max 12          # add a P/E gate on top
-python screener.py --universe my_codes.txt   # one ASX code per line, e.g. "BHP"
+**Windows** (PowerShell or Command Prompt):
+
+```powershell
+py -m pip install yfinance
+py screener.py                      # EV/EBIT < 8 or OE yield >= 10%
+py screener.py --ev-ebit-max 6      # tighten the multiple
+py screener.py --oe-yield-min 12    # demand a higher owner's-earnings yield
+py screener.py --min-return-on-capital 15   # gate on return on capital
+py screener.py --universe my_codes.txt      # one ASX code per line, e.g. "BHP"
 ```
+
+On **macOS or Linux** substitute `python3` for `py`. The `py` launcher comes
+with the python.org Windows installer; if it is not on your PATH, use `python`.
 
 It rewrites `data.json` and prints the first ten to the terminal. Run `build.py`
 afterwards to publish the refreshed figures to the installed app.
@@ -300,10 +305,19 @@ footer shows the build — useful for confirming a phone picked up a new deploy.
 `app.html` is the single source of the interface (it doubles as the Claude
 Artifact copy). `docs/` is generated — never edit it by hand:
 
-```bash
-python screener.py     # optional: pull live figures -> data.json
-python build.py        # app.html + assets -> ../docs/
-python make_icon.py    # only if you want to redraw the icons
+```powershell
+py screener.py     # optional: pull live figures -> data.json
+py build.py        # app.html + assets -> ../docs/
+py make_icon.py    # only if you want to redraw the icons
+```
+
+Then publish. In PowerShell, run these as separate lines — Windows PowerShell
+5.1 does not support `&&` chaining:
+
+```powershell
+git add -A
+git commit -m "Refresh screen"
+git push
 ```
 
 Commit and push, and the live app updates. Inside an already-installed app the

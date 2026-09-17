@@ -35,11 +35,15 @@ passes, as extra context — they are not screening criteria.
 Pulls live fundamentals from Yahoo Finance via `yfinance` and writes
 `data.json` (consumed by app.html) plus prints the first ten matches.
 
-Usage:
-    pip install yfinance
-    python screener.py                 # default universe, P/E < 10
-    python screener.py --pe-max 12     # widen the multiple
-    python screener.py --universe my_tickers.txt   # one ASX code per line
+Usage (Windows PowerShell or Command Prompt):
+    py -m pip install yfinance
+    py screener.py                      # EV/EBIT < 8 or OE yield >= 10%
+    py screener.py --ev-ebit-max 6      # tighten the multiple
+    py screener.py --min-return-on-capital 15   # gate on return on capital
+    py screener.py --universe my_tickers.txt    # one ASX code per line
+
+On macOS or Linux substitute `python3` for `py`. The `py` launcher ships with
+the python.org Windows installer; if it is missing, use `python` instead.
 
 Note: run this where Yahoo Finance is reachable (your own machine/phone).
 Some managed/CI networks block finance.yahoo.com.
