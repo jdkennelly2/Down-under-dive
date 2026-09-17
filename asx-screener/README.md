@@ -163,6 +163,23 @@ cheap-looking business gets rejected. `GM-FALL` exists because a position can
 make money and still have been a mistake: if the gross line deteriorates, the
 thesis was wrong even when the outcome was positive.
 
+**Only `LEASE` and `DIVERGE` can hide a name**, and each has its own toggle.
+Both describe a *figure* being wrong — the number on screen overstates, or the
+two routes to it disagree — so filtering on them removes rows whose data
+cannot be trusted as shown.
+
+`GM-FALL` and `PAYABLES` are always displayed and never filter. They describe
+the *business*, not the arithmetic, and that is a judgement to make rather
+than a row to sweep away.
+
+## A note on return on tangible capital
+
+`oeReturnOnCapital` runs very high — several hundred per cent — for
+capital-light businesses, because the tangible capital base is genuinely tiny.
+That is the signal, not an artefact: it says the business earns its cash
+without needing much capital to do it. The figure is reported as computed and
+deliberately not capped.
+
 ## Quality metrics
 
 Also computed, as context rather than gates:

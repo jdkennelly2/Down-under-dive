@@ -160,7 +160,16 @@
 
   /* toggle switch */
   .switch{position:relative;flex:0 0 auto;width:44px;height:26px;}
-  .switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;}
+  /* The visible switch is 44x26, below the 44pt minimum touch target, which
+     made it fiddly to hit and easy to turn into a scroll gesture. The input
+     is stretched past the switch on every side so the tappable area is
+     ~64x48, and touch-action stops the browser waiting to see if a tap was
+     the start of a gesture. */
+  .switch input{
+    position:absolute;inset:-11px -10px;width:auto;height:auto;
+    opacity:0;margin:0;cursor:pointer;touch-action:manipulation;z-index:1;
+  }
+  .ctl label{touch-action:manipulation;}
   .track{
     position:absolute;inset:0;border-radius:99px;background:var(--hair-strong);
     transition:background .18s ease;
@@ -353,9 +362,13 @@
     </div>
     <input id="roc" type="range" min="0" max="40" step="1" value="0" hidden
            aria-label="Minimum return on tangible capital">
-    <div class="ctl" id="flagCtl" hidden>
-      <label for="fl">Hide flagged names<span class="hint">Lease, payables, margin or divergence warnings</span></label>
-      <span class="switch"><input id="fl" type="checkbox"><span class="track"></span></span>
+    <div class="ctl" id="leaseCtl" hidden>
+      <label for="hl">Hide lease-flagged<span class="hint">Both owner's-earnings figures overstate these</span></label>
+      <span class="switch"><input id="hl" type="checkbox"><span class="track"></span></span>
+    </div>
+    <div class="ctl" id="divCtl" hidden>
+      <label for="hd">Hide divergent<span class="hint">The two owner's-earnings routes disagree</span></label>
+      <span class="switch"><input id="hd" type="checkbox"><span class="track"></span></span>
     </div>
 
     <h2 class="subhead">Exclude</h2>
@@ -7952,8 +7965,8 @@
   const $ = s => document.querySelector(s);
   const listEl = $("#list"), exListEl = $("#exList"), exWrap = $("#exWrap");
   const peIn = $("#pe"), cfIn = $("#cf"), phIn = $("#ph"), mxIn = $("#mx"),
-        rtIn = $("#rt"), fmIn = $("#fm"), rocIn = $("#roc"), flIn = $("#fl"),
-        oeIn = $("#oe");
+        rtIn = $("#rt"), fmIn = $("#fm"), rocIn = $("#roc"),
+        oeIn = $("#oe"), hlIn = $("#hl"), hdIn = $("#hd");
 
   // The dataset decides which valuation metric the app screens on. Once
   // screener.py has run, EV/EBIT is present and leads; until then the app
@@ -8013,8 +8026,14 @@
       return {pass:false, sev:"fail",
               why: s.isMiningExploration ? "Mining exploration" : "Mining / energy"};
     if(opts.cf && !s.cashFlowPositive) return {pass:false, sev:"fail", why:"Not cash-flow positive"};
-    if(opts.hideFlagged && flagsFor(s).length)
-      return {pass:false, sev:"warn", why:flagsFor(s).map(f=>f[0]).join(", ")};
+    // Only the two flags that describe a figure being wrong can hide a name.
+    // GM-FALL and PAYABLES are always shown and never filter: a falling gross
+    // line is a judgement to make, not a row to sweep away.
+    const flags = flagsFor(s).map(f => f[0]);
+    if(opts.hideLease && flags.includes("LEASE"))
+      return {pass:false, sev:"warn", why:"LEASE"};
+    if(opts.hideDiverge && flags.includes("DIVERGE"))
+      return {pass:false, sev:"warn", why:"DIVERGE"};
     if(opts.roc > 0){
       const r = s.oeReturnOnCapital;
       if(r === null || r === undefined || r < opts.roc)
@@ -8044,7 +8063,8 @@
   function render(){
     const opts = {val:parseFloat(peIn.value), cf:cfIn.checked, ph:phIn.checked,
                   mx:mxIn.checked, rt:rtIn.checked, fm:fmIn.checked,
-                  roc:parseFloat(rocIn.value) || 0, hideFlagged:flIn.checked,
+                  roc:parseFloat(rocIn.value) || 0,
+                  hideLease:hlIn.checked, hideDiverge:hdIn.checked,
                   oe:parseFloat(oeIn.value) || 0};
     $("#peOut").textContent = "< " + opts.val.toFixed(1);
     $("#rocOut").textContent = "\u2265 " + opts.roc.toFixed(0) + "%";
@@ -8155,7 +8175,7 @@
     return div;
   }
 
-  [peIn,cfIn,phIn,mxIn,rtIn,fmIn,rocIn,flIn,oeIn].forEach(el => el.addEventListener("input", render));
+  [peIn,cfIn,phIn,mxIn,rtIn,fmIn,rocIn,oeIn,hlIn,hdIn].forEach(el => el.addEventListener("input", render));
 
   // Show the richer controls only once the data can answer them.
   function configureForData(){
@@ -8173,10 +8193,13 @@
     $("#rocCtl").hidden = !showRoc;
     rocIn.hidden = !showRoc;
 
-    $("#flagCtl").hidden = !DATA.stocks.some(s => flagsFor(s).length);
+    // Each toggle appears only if the data actually carries that flag.
+    const hasFlag = f => DATA.stocks.some(s => flagsFor(s).some(([n]) => n === f));
+    $("#leaseCtl").hidden = !hasFlag("LEASE");
+    $("#divCtl").hidden = !hasFlag("DIVERGE");
   }
 
-  const BUILD = "2026-09-17.3";
+  const BUILD = "2026-09-17.4";
 
   function reportMode(){
     const installed = matchMedia("(display-mode: standalone)").matches
