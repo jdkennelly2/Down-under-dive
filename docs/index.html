@@ -8014,6 +8014,17 @@
       f.push(["GM-FALL", "Gross margin fell more than 1.5 points year on year"]);
     if((s.oeDivergence ?? 0) > 0.4)
       f.push(["DIVERGE", "The two owner's-earnings routes disagree by over 40%"]);
+    // Provenance, not judgement: these say the figures on this card came out
+    // of the source imperfectly. Shown when the data carries them, absent on
+    // older builds of data.json, and never able to hide a name.
+    if(s.currencyUnavailable)
+      f.push(["FX", `Accounts are in ${s.reportingCurrency} and no rate was available — figures omitted rather than mixed with an AUD market cap`]);
+    else if(s.currencyConverted)
+      f.push(["FX", `Accounts are in ${s.reportingCurrency}, converted to AUD at a spot rate`]);
+    if(s.sharesStale)
+      f.push(["SHARES", "Fewer shares on issue than the balance sheet reports — market cap may predate a raising, so yields read high"]);
+    if(s.periodMixed && s.periodMixed.length)
+      f.push(["PERIOD", `Not on the latest statement, taken from an earlier year: ${s.periodMixed.join(", ")}`]);
     return f;
   }
   let DATA = SEED;
@@ -8199,7 +8210,7 @@
     $("#divCtl").hidden = !hasFlag("DIVERGE");
   }
 
-  const BUILD = "2026-09-17.4";
+  const BUILD = "2026-09-17.5";
 
   function reportMode(){
     const installed = matchMedia("(display-mode: standalone)").matches

@@ -153,6 +153,12 @@ LINES = {
             "Cash Flows From Used In Operating Activities Direct",
             "Cash Generated From Operating Activities"),
     "capex": ("Capital Expenditure", "Purchase Of PPE", "Net PPE Purchase And Sale"),
+    # Capitalised software and other intangibles are real capital spending
+    # that the provider's "Capital Expenditure" line leaves out — and they
+    # are where the spend sits for exactly the capital-light businesses
+    # this method favours. Excluded, owner's earnings are overstated.
+    "capex_intangibles": ("Purchase Of Intangibles",
+                          "Net Intangibles Purchase And Sale"),
     "wc_change": ("Change In Working Capital", "Changes In Working Capital"),
     "ebit": ("EBIT", "Operating Income", "Total Operating Income As Reported"),
     "ebitda": ("EBITDA", "Normalized EBITDA"),
@@ -174,6 +180,7 @@ LINES = {
     "nta_direct": ("Net Tangible Assets", "Tangible Book Value"),
     "net_debt": ("Net Debt",),
     "working_capital": ("Working Capital",),
+    "shares": ("Ordinary Shares Number", "Share Issued"),
     "lease_total": ("Capital Lease Obligations",),
     "wc_payables": ("Change In Payable", "Change In Account Payable",
                     "Changes In Account Receivables"),
@@ -194,53 +201,79 @@ def _norm(s):
     return "".join(ch for ch in str(s).lower() if ch.isalnum())
 
 
-def _value(df, label):
+# Every figure in one owner's-earnings calculation has to come from the SAME
+# reporting period. Reading each row's newest non-null value independently
+# mixes years without saying so — NPAT from FY25 against D&A from FY24 is an
+# artefact, not a result. Lines are read from one pinned column; where the
+# line is genuinely absent there, an older period is used and the key is
+# recorded, so the company gets flagged rather than quietly mis-stated.
+_REACHED_BACK = set()
+
+
+def _col_value(df, label, col):
+    """One cell, as a float, or None for missing/NaN/non-numeric."""
     try:
-        v = df.loc[label].dropna()
-        return float(v.iloc[0]) if len(v) else None
+        v = float(df.loc[label, col])
     except Exception:
         return None
+    return None if v != v else v      # NaN is the only value unequal to itself
+
+
+def _resolve(df, key):
+    """Row labels on this statement matching the aliases for `key`, exact
+    matches first, then the guarded token fallback."""
+    labels = list(df.index)
+    norm = {lbl: _norm(lbl) for lbl in labels}
+    hits = []
+    for alias in LINES[key]:
+        want = _norm(alias)
+        hits.extend(lbl for lbl in labels if norm[lbl] == want and lbl not in hits)
+    required, forbidden = FALLBACK.get(key, ((), ()))
+    if required:
+        hits.extend(lbl for lbl in labels
+                    if lbl not in hits
+                    and all(t in norm[lbl] for t in required)
+                    and not any(f in norm[lbl] for f in forbidden))
+    return hits
 
 
 def line(df, key):
-    """Most recent value for a statement line, or None when not reported."""
-    if df is None or getattr(df, "empty", True):
+    """A statement line, read from the statement's newest reporting period.
+
+    Reaches back to an earlier period only when the newest does not report
+    the line at all, and records that it did — see _REACHED_BACK."""
+    if df is None or getattr(df, "empty", True) or not len(df.columns):
         return None
-    labels = list(df.index)
-    norm = {lbl: _norm(lbl) for lbl in labels}
-
-    for alias in LINES[key]:
-        want = _norm(alias)
-        for lbl in labels:
-            if norm[lbl] == want:
-                v = _value(df, lbl)
-                if v is not None:
-                    return v
-
-    required, forbidden = FALLBACK.get(key, ((), ()))
-    if required:
-        for lbl in labels:
-            n = norm[lbl]
-            if all(tok in n for tok in required) and not any(f in n for f in forbidden):
-                v = _value(df, lbl)
-                if v is not None:
-                    return v
+    hits = _resolve(df, key)
+    for lbl in hits:
+        v = _col_value(df, lbl, df.columns[0])
+        if v is not None:
+            return v
+    for lbl in hits:
+        for col in df.columns[1:]:
+            v = _col_value(df, lbl, col)
+            if v is not None:
+                _REACHED_BACK.add(key)
+                return v
     return None
+
+
+def series_dated(df, key, n=4):
+    """Up to n (period, value) pairs for a line, newest first. Dated, because
+    counting list entries to get a growth rate assumes no year is missing."""
+    if df is None or getattr(df, "empty", True):
+        return []
+    for lbl in _resolve(df, key):
+        pts = [(col, _col_value(df, lbl, col)) for col in list(df.columns)[:n]]
+        pts = [(c, v) for c, v in pts if v is not None]
+        if pts:
+            return pts
+    return []
 
 
 def series(df, key, n=4):
     """Up to n most recent values for a line, newest first."""
-    if df is None or getattr(df, "empty", True):
-        return []
-    for alias in LINES[key]:
-        for label in df.index:
-            if str(label).strip().lower() == alias.lower():
-                try:
-                    v = df.loc[label].dropna()
-                    return [float(x) for x in v.iloc[:n]]
-                except Exception:
-                    pass
-    return []
+    return [v for _, v in series_dated(df, key, n)]
 
 
 def gross_margin_trend(inc):
@@ -260,12 +293,23 @@ def gross_margin_trend(inc):
 
 def revenue_cagr(inc):
     """Compound revenue growth across the available statement years."""
-    rev = series(inc, "revenue", 4)
-    if len(rev) < 2 or rev[-1] <= 0:
+    pts = series_dated(inc, "revenue", 4)
+    if len(pts) < 2:
         return None
-    years = len(rev) - 1
+    (d_new, v_new), (d_old, v_old) = pts[0], pts[-1]
+    if v_old <= 0 or v_new <= 0:
+        return None
+    # Measure the span from the statement dates, not from how many values
+    # came back: a missing year in the middle would otherwise shorten the
+    # period and overstate the growth rate.
     try:
-        return round(100 * ((rev[0] / rev[-1]) ** (1 / years) - 1), 1)
+        years = (d_new - d_old).days / 365.25
+    except (AttributeError, TypeError):
+        years = len(pts) - 1
+    if not years or years < 0.5:
+        return None
+    try:
+        return round(100 * ((v_new / v_old) ** (1 / years) - 1), 1)
     except (ValueError, ZeroDivisionError):
         return None
 
@@ -310,7 +354,14 @@ def owner_earnings(inc, cf, bs):
     capex = line(cf, "capex")           # reported negative
     cfo = line(cf, "cfo")
 
+    # Total capex, PP&E plus capitalised intangibles. Maintenance cannot be
+    # separated from growth at filing level, so this is a floor rather than a
+    # target — but leaving intangibles out was not conservatism, it was an
+    # overstatement, and it fell hardest on capital-light businesses.
+    intangible_capex = line(cf, "capex_intangibles")
     capex_out = abs(capex) if capex is not None else None
+    if capex_out is not None and intangible_capex:
+        capex_out += abs(intangible_capex)
     # Prefer the provider's own lease total; fall back to summing the halves.
     lease = line(bs, "lease_total")
     if lease is None:
@@ -329,7 +380,8 @@ def owner_earnings(inc, cf, bs):
     if cfo is not None and capex_out is not None:
         oe_cfo = cfo - capex_out
 
-    return oe_npat, oe_cfo, (lease or None)
+    return oe_npat, oe_cfo, (lease or None), capex_out, (
+        abs(intangible_capex) if intangible_capex else None)
 
 
 def tangible_equity(bs):
@@ -372,6 +424,33 @@ def as_pct(num, den):
         return round(100 * num / den, 2)
     except (TypeError, ZeroDivisionError):
         return None
+
+
+_FX = {}
+
+
+def to_aud(ccy):
+    """Rate converting a reporting currency into AUD, or None when unavailable.
+
+    Statements come back in the company's functional currency while market
+    cap and enterprise value come back in AUD. An ASX-listed USD reporter
+    therefore looks about a third cheaper than it is on every yield and every
+    multiple — silently, and in the direction that puts it on the screen.
+    Converting a full year of P&L at a spot rate is itself approximate, so
+    the mismatch is flagged as well as corrected."""
+    if not ccy or str(ccy).upper() == "AUD":
+        return 1.0
+    key = str(ccy).upper()
+    if key not in _FX:
+        rate = None
+        try:
+            h = yf.Ticker(f"{key}AUD=X").history(period="5d")
+            if len(h):
+                rate = float(h["Close"].iloc[-1])
+        except Exception:
+            rate = None
+        _FX[key] = rate if rate and rate > 0 else None
+    return _FX[key]
 
 
 def dedupe(codes):
@@ -474,17 +553,43 @@ def fetch(code):
     except Exception:
         inc = cf = bs = None
 
+    _REACHED_BACK.clear()
+
+    # Statements are reported in the company's functional currency; market
+    # cap and enterprise value come back in AUD. Mixing the two understates
+    # every multiple and overstates every yield for a foreign-currency
+    # reporter — which is to say, it puts them on the screen wrongly.
+    ccy = (info.get("financialCurrency") or "AUD").upper()
+    fx = to_aud(ccy)
+
+    def aud(v):
+        """A statement figure in AUD, or None when the rate is unavailable —
+        an absent number is better than one off by a third."""
+        if v is None or fx is None:
+            return None
+        return v * fx
+
     ev = info.get("enterpriseValue")
     mcap = info.get("marketCap")
     ebit = line(inc, "ebit")
     if ebit is None and line(inc, "ebitda") is not None:
         da = line(cf, "dand_a")
         ebit = line(inc, "ebitda") - da if da is not None else None
+    ebit = aud(ebit)
 
-    oe_npat, oe_cfo, lease = owner_earnings(inc, cf, bs)
+    oe_npat, oe_cfo, lease, capex_total, capex_intangibles = owner_earnings(inc, cf, bs)
+    oe_npat, oe_cfo, lease = aud(oe_npat), aud(oe_cfo), aud(lease)
+    capex_total, capex_intangibles = aud(capex_total), aud(capex_intangibles)
     nta, cash = tangible_equity(bs)
-    npat = line(inc, "npat")
-    debt = line(bs, "debt") or info.get("totalDebt")
+    nta, cash = aud(nta), aud(cash)
+    npat = aud(line(inc, "npat"))
+
+    # `or` would take the provider's figure for a company that genuinely
+    # reports zero debt, because 0.0 is falsy. Only absence should fall back.
+    debt = line(bs, "debt")
+    if debt is None:
+        debt = info.get("totalDebt")
+    debt = aud(debt)
 
     # Tangible capital employed: net tangible assets with cash taken out and
     # debt added back, i.e. the capital the operating business actually uses.
@@ -502,10 +607,10 @@ def fetch(code):
     # by liabilities is not really cash:
     #   net cash        = cash - borrowings
     #   net of all debts= cash - total liabilities   (the stricter view)
-    liabilities = line(bs, "liabilities")
+    liabilities = aud(line(bs, "liabilities"))
     net_cash = (cash - debt) if (cash is not None and debt is not None) else None
     if net_cash is None:
-        nd = line(bs, "net_debt")        # provider reports debt LESS cash
+        nd = aud(line(bs, "net_debt"))   # provider reports debt LESS cash
         net_cash = -nd if nd is not None else None
     net_of_all = (cash - liabilities) if (cash is not None and liabilities is not None) else None
 
@@ -514,6 +619,21 @@ def fetch(code):
     divergence = None
     if oe_npat and oe_cfo and max(abs(oe_npat), abs(oe_cfo)) > 0:
         divergence = round(abs(oe_npat - oe_cfo) / max(abs(oe_npat), abs(oe_cfo)), 3)
+
+    # Market cap is price x shares outstanding, and shares outstanding lags a
+    # capital raising on a micro cap. Where the provider knows of FEWER
+    # shares than the balance sheet already reported, the market cap is stale
+    # and too small — so every yield computed against it is too high. The
+    # reverse gap is ordinary: the balance sheet is simply older.
+    bs_shares, live_shares = line(bs, "shares"), info.get("sharesOutstanding")
+    shares_stale = bool(
+        bs_shares and live_shares and live_shares < bs_shares * 0.98)
+
+    period = None
+    for df in (inc, cf, bs):
+        if df is not None and not getattr(df, "empty", True) and len(df.columns):
+            period = str(df.columns[0])[:10]
+            break
 
     return {
         "ticker": code,
@@ -529,6 +649,13 @@ def fetch(code):
         "isResourcesEnergy": is_resources_or_energy(info),
         "isREIT": is_reit(info),
         "isFundManager": is_fund_manager(info),
+        # --- provenance: which accounts these figures actually came from ---
+        "statementPeriod": period,
+        "reportingCurrency": ccy,
+        "currencyConverted": ccy != "AUD" and fx is not None,
+        "currencyUnavailable": ccy != "AUD" and fx is None,
+        "periodMixed": sorted(_REACHED_BACK) or None,
+        "sharesStale": shares_stale,
         # --- valuation on the owner's-earnings basis ---
         # A net-cash business can have negative enterprise value, which makes
         # EV/EBIT negative and sorts it to the top as the "cheapest" name in
@@ -546,6 +673,8 @@ def fetch(code):
         "oeYieldNpat": as_pct(oe_npat, mcap),
         "oeYieldCfo": as_pct(oe_cfo, mcap),
         "oeDivergence": divergence,
+        "capex": capex_total,
+        "capexIntangibles": capex_intangibles,
         "leaseLiabilities": lease,
         "leaseHeavy": bool(lease and ev and lease / ev > 0.15),
         "nta": nta,
@@ -562,19 +691,6 @@ def fetch(code):
         "marketCap": mcap,
         "note": "",
     }
-
-
-def passes(s, pe_max):
-    return (
-        not s["isPharma"]
-        and not s["isResourcesEnergy"]
-        and not s["isMiningExploration"]
-        and not s["isREIT"]
-        and not s["isFundManager"]
-        and s["cashFlowPositive"]
-        and s["pe"] is not None
-        and s["pe"] < pe_max
-    )
 
 
 def dump_labels(code):

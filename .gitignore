@@ -1,0 +1,3 @@
+# Filled reconciliation files name the companies being examined, and this
+# repository is public. The template generator recreates them on demand.
+asx-screener/verify/*.json

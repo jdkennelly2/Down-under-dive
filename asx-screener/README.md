@@ -146,6 +146,81 @@ because they are reasons to look, not reasons to doubt:
 | `CASH>MCAP` | Net cash exceeds the entire market capitalisation |
 | `NET-CASH` | Net cash is at least 30% of market capitalisation |
 
+## Checking the data against the lodged accounts
+
+Yahoo does not publish company accounts. It re-maps them onto a standardised,
+broadly US-GAAP template, and **the mapping is where figures go wrong**: an
+ASX filer reports under AASB, and lines that do not correspond get folded,
+renamed or dropped. The screen is worth exactly what that mapping is worth, so
+it needs checking against the source document rather than trusted.
+
+`verify.py` does that one company at a time:
+
+```powershell
+py verify.py --template ACU     # writes verify\ACU.json, pre-filled with Yahoo
+                                # open it, type the annual-report figures in
+py verify.py ACU                # prints the variance report
+```
+
+The report has two halves and **the second is the one that matters**:
+
+| Block | What it shows |
+|-------|---------------|
+| `LINE ITEMS` | every input, Yahoo against the annual report, with the gap |
+| `VERDICT` | owner's earnings, EV/EBIT and return on capital recomputed from *both* sets |
+
+A 3% error on a line no decision turns on is noise. A 3% error on capex that
+moves the owner's-earnings yield through the 10% hurdle is the whole game.
+Judge the mapping on the measures, not on the inputs.
+
+Filled reconciliation files are **git-ignored**. The repository is public, and
+a file named after a company is a statement of interest in it.
+
+### What the audit of the calculation found
+
+Read against the source, four things were wrong. All are fixed; they are
+recorded here because each one biased the screen in the same direction —
+**towards showing a business as cheaper and better than it is**.
+
+**Figures were being mixed across reporting years.** Each line was read as
+"the most recent value that is not blank", *independently per line*. Where a
+company did not report D&A in its latest year, FY25 profit was silently set
+against FY24 depreciation. Lines are now read from one pinned reporting
+period; where a line genuinely is not on the newest statement, an earlier one
+is used and the company is flagged `PERIOD` rather than quietly mis-stated.
+
+**Foreign-currency reporters were compared against an AUD market cap.**
+Statements come back in the company's functional currency, market cap and
+enterprise value in AUD. A USD reporter's earnings were divided by an AUD
+market cap, making it look roughly a third cheaper than it was — on every
+yield and every multiple, silently, and in the direction that puts a name on
+the screen. Statement figures are now converted, the company flagged `FX`,
+and where no rate is available the ratios are **omitted rather than
+approximated**.
+
+**Capitalised intangibles were not counted as capital spending.** The
+provider's "Capital Expenditure" is purchases of property, plant and
+equipment. Capitalised software is real capital going out the door, and it
+is precisely where the spend sits for the capital-light businesses this
+method favours — so the omission fell hardest on the names most likely to
+pass. Both are now counted, and `capexIntangibles` is reported separately so
+the size of the correction is visible.
+
+**A debt-free company took the wrong figure.** `line(bs, "debt") or
+info["totalDebt"]` falls through when the balance sheet reports zero, because
+`0.0` is falsy in Python. A company that had genuinely repaid its borrowings
+got the provider's estimate instead of its own accounts.
+
+A fifth is reported rather than fixed, because it cannot be: **market cap can
+predate a capital raising.** It is price times shares outstanding, and shares
+outstanding lags a placement on a micro cap. Where the provider knows of
+fewer shares than the balance sheet already reported, the market cap is too
+small and every yield against it too high — flagged `SHARES`.
+
+Growth rates were also measured by counting how many values came back, which
+shortened the period and overstated the rate whenever a year was missing in
+the middle. The span is now measured from the statement dates.
+
 ## Warnings
 
 Each flag marks a specific way a headline figure misleads. They come from
@@ -157,6 +232,16 @@ post-mortems on real mistakes, not from theory:
 | `PAYABLES` | Over 25% of operating cash flow came from working capital rather than trading. Stretching creditors is not earnings |
 | `GM-FALL` | Gross margin fell more than 1.5pts. A thesis survives a weak year; it rarely survives the gross line eroding |
 | `DIVERGE` | The two owner's-earnings routes disagree by more than 40% |
+
+These four are about the business. The next three are about the **data**, and
+say the figures on the card came out of the source imperfectly. None of them
+can hide a name — they tell you how much weight the numbers will bear.
+
+| Flag | What it catches |
+|------|-----------------|
+| `FX` | Accounts are in a currency other than AUD. Converted at a spot rate, which a full year of P&L only approximately deserves; where no rate was available the ratios are omitted instead |
+| `SHARES` | Fewer shares on issue than the balance sheet reports — market cap may predate a raising, so every yield reads high |
+| `PERIOD` | A line was not on the latest statement and came from an earlier year. The figures named are not all from the same set of accounts |
 
 `LEASE` and `PAYABLES` exist because those two are the recurring reasons a
 cheap-looking business gets rejected. `GM-FALL` exists because a position can
