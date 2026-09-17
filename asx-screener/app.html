@@ -299,6 +299,12 @@
       <label for="cf">Cash-flow positive<span class="hint">Generates cash, not just accounting profit</span></label>
       <span class="switch"><input id="cf" type="checkbox" checked><span class="track"></span></span>
     </div>
+    <div class="ctl" id="oeCtl" hidden>
+      <label for="oe">Min owner's-earnings yield<span class="hint">Cash earnings ÷ market cap — a second way in</span></label>
+      <output class="pe-val" id="oeOut">&ge; 10%</output>
+    </div>
+    <input id="oe" type="range" min="0" max="40" step="1" value="10" hidden
+           aria-label="Minimum owner's-earnings yield">
     <div class="ctl" id="rocCtl" hidden>
       <label for="roc">Min return on capital<span class="hint">Owner's earnings ÷ tangible capital employed</span></label>
       <output class="pe-val" id="rocOut">&ge; 0%</output>
@@ -828,7 +834,8 @@
   const $ = s => document.querySelector(s);
   const listEl = $("#list"), exListEl = $("#exList"), exWrap = $("#exWrap");
   const peIn = $("#pe"), cfIn = $("#cf"), phIn = $("#ph"), mxIn = $("#mx"),
-        rtIn = $("#rt"), fmIn = $("#fm"), rocIn = $("#roc"), flIn = $("#fl");
+        rtIn = $("#rt"), fmIn = $("#fm"), rocIn = $("#roc"), flIn = $("#fl"),
+        oeIn = $("#oe");
 
   // The dataset decides which valuation metric the app screens on. Once
   // screener.py has run, EV/EBIT is present and leads; until then the app
@@ -896,32 +903,46 @@
         return {pass:false, sev:"fail",
                 why: r == null ? "No return on capital" : "RoC " + r.toFixed(0) + "%"};
     }
+    // Three routes in, the same three the engine uses: a cheap multiple, a
+    // high owner's-earnings yield, or a balance sheet full of net cash.
+    // Dropping any one of them makes the app disagree with the screener.
     const v = s[VAL.key];
+    const oe = s.oeYieldCfo;
+    const cheapMultiple = v !== null && v !== undefined && v < opts.val;
+    const cheapYield = oe !== null && oe !== undefined && oe >= opts.oe;
     const cashRich = (s.netCashPctMarketCap ?? 0) >= 30;
-    if(v === null || v === undefined)
-      return cashRich ? {pass:true} : {pass:false, sev:"fail", why:"No " + VAL.short};
-    if(v >= opts.val){
+    if(cheapMultiple || cheapYield || cashRich) return {pass:true};
+
+    // Report the near miss rather than just the absence.
+    if(v !== null && v !== undefined){
       const sev = v < opts.val + 1.5 ? "warn" : "fail";
       return {pass:false, sev, why:VAL.short + " " + v.toFixed(1)};
     }
-    return {pass:true};
+    if(oe !== null && oe !== undefined)
+      return {pass:false, sev:"warn", why:"OE yield " + oe.toFixed(1) + "%"};
+    return {pass:false, sev:"fail", why:"No " + VAL.short};
   }
 
   function render(){
     const opts = {val:parseFloat(peIn.value), cf:cfIn.checked, ph:phIn.checked,
                   mx:mxIn.checked, rt:rtIn.checked, fm:fmIn.checked,
-                  roc:parseFloat(rocIn.value) || 0, hideFlagged:flIn.checked};
+                  roc:parseFloat(rocIn.value) || 0, hideFlagged:flIn.checked,
+                  oe:parseFloat(oeIn.value) || 0};
     $("#peOut").textContent = "< " + opts.val.toFixed(1);
     $("#rocOut").textContent = "\u2265 " + opts.roc.toFixed(0) + "%";
+    $("#oeOut").textContent = "\u2265 " + opts.oe.toFixed(0) + "%";
 
     const key = VAL.key;
     const stocks = DATA.stocks.map(s => ({s, r:classify(s, opts)}));
     // Cheapest multiple first, then the net-cash names, then the rest — so a
     // company whose cash exceeds its market cap is not buried for lacking a
     // multiple it cannot meaningfully have.
-    const rank = s => s[key] !== null && s[key] !== undefined
-      ? [0, s[key]]
-      : ((s.netCashPctMarketCap ?? 0) >= 30 ? [1, -s.netCashPctMarketCap] : [2, 0]);
+    const rank = s => {
+      if(s[key] !== null && s[key] !== undefined) return [0, s[key]];
+      if((s.netCashPctMarketCap ?? 0) >= 30) return [1, -s.netCashPctMarketCap];
+      if(s.oeYieldCfo !== null && s.oeYieldCfo !== undefined) return [2, -s.oeYieldCfo];
+      return [3, 0];
+    };
     const passes = stocks.filter(x => x.r.pass)
                          .sort((a,b)=>{const A=rank(a.s),B=rank(b.s);
                                        return A[0]-B[0] || A[1]-B[1];});
@@ -939,7 +960,8 @@
     if(!shown.length){
       const li = document.createElement("li");
       li.className = "empty";
-      li.textContent = "Nothing clears these filters. Loosen the " + VAL.short + " ceiling or a toggle above.";
+      li.textContent = "Nothing clears these filters. Loosen the " + VAL.short
+        + " ceiling, the owner's-earnings yield, or a toggle above.";
       listEl.append(li);
     }
     shown.forEach((x,i) => listEl.append(card(x.s, i+1)));
@@ -982,6 +1004,9 @@
     const c = s.netCashPctMarketCap;
     if(c !== null && c !== undefined && c >= 30)
       return `<b>${c.toFixed(0)}%</b><small>Net cash</small>`;
+    const oe = s.oeYieldCfo;
+    if(oe !== null && oe !== undefined)
+      return `<b>${oe.toFixed(0)}%</b><small>OE yield</small>`;
     return `<b>&mdash;</b><small>${VAL.short}</small>`;
   }
 
@@ -1012,7 +1037,7 @@
     return div;
   }
 
-  [peIn,cfIn,phIn,mxIn,rtIn,fmIn,rocIn,flIn].forEach(el => el.addEventListener("input", render));
+  [peIn,cfIn,phIn,mxIn,rtIn,fmIn,rocIn,flIn,oeIn].forEach(el => el.addEventListener("input", render));
 
   // Show the richer controls only once the data can answer them.
   function configureForData(){
@@ -1022,6 +1047,10 @@
     $("#valHint").textContent = VAL.hint;
     peIn.value = VAL.def;
 
+    const showOe = has("oeYieldCfo");
+    $("#oeCtl").hidden = !showOe;
+    oeIn.hidden = !showOe;
+
     const showRoc = has("oeReturnOnCapital");
     $("#rocCtl").hidden = !showRoc;
     rocIn.hidden = !showRoc;
@@ -1029,7 +1058,7 @@
     $("#flagCtl").hidden = !DATA.stocks.some(s => flagsFor(s).length);
   }
 
-  const BUILD = "2026-09-17.2";
+  const BUILD = "2026-09-17.3";
 
   function reportMode(){
     const installed = matchMedia("(display-mode: standalone)").matches
