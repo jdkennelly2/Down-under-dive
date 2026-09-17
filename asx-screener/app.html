@@ -201,6 +201,12 @@
     font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;
   }
   .chip.flag::before{content:"! ";font-weight:700;}
+  /* A find, not a caution: something worth a look rather than a doubt. */
+  .chip.find{
+    color:var(--accent-ink);background:var(--pass-bg);border-color:transparent;
+    font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;
+  }
+  .chip.find::before{content:"\2605 ";}
   .cardnote{grid-column:1/4;font-size:12px;color:var(--muted);line-height:1.4;}
 
   /* dividend context — secondary to the screen, not a filter */
@@ -834,11 +840,27 @@
   const STATS = [
     {k:"oeReturnOnCapital", label:"Ret. on capital"},
     {k:"oeYieldCfo",        label:"OE yield"},
+    {k:"netCashPctMarketCap", label:"Net cash %"},
     {k:"revenueCagr",       label:"Rev growth"},
     {k:"grossMargin",       label:"Gross margin"},
     {k:"dividendYield",     label:"Div yield"},
     {k:"payoutRatio",       label:"Payout", strainAbove:100},
   ];
+
+  // Findings: worth surfacing, not cautions. A business holding more net
+  // cash than its market capitalisation has negative enterprise value, so
+  // EV/EBIT is omitted — without this it would show no headline number at
+  // all and read as missing data rather than as the point.
+  function findsFor(s){
+    const f = [], c = s.netCashPctMarketCap;
+    if(c !== null && c !== undefined){
+      if(c >= 100) f.push(["CASH>MCAP",
+        `Net cash is ${c.toFixed(0)}% of market cap — the business comes close to free`]);
+      else if(c >= 30) f.push(["NET-CASH",
+        `Net cash is ${c.toFixed(0)}% of market cap`]);
+    }
+    return f;
+  }
 
   // Each warning marks a specific way the headline figure misleads.
   function flagsFor(s){
@@ -872,8 +894,9 @@
                 why: r == null ? "No return on capital" : "RoC " + r.toFixed(0) + "%"};
     }
     const v = s[VAL.key];
+    const cashRich = (s.netCashPctMarketCap ?? 0) >= 30;
     if(v === null || v === undefined)
-      return {pass:false, sev:"fail", why:"No " + VAL.short};
+      return cashRich ? {pass:true} : {pass:false, sev:"fail", why:"No " + VAL.short};
     if(v >= opts.val){
       const sev = v < opts.val + 1.5 ? "warn" : "fail";
       return {pass:false, sev, why:VAL.short + " " + v.toFixed(1)};
@@ -890,8 +913,15 @@
 
     const key = VAL.key;
     const stocks = DATA.stocks.map(s => ({s, r:classify(s, opts)}));
+    // Cheapest multiple first, then the net-cash names, then the rest — so a
+    // company whose cash exceeds its market cap is not buried for lacking a
+    // multiple it cannot meaningfully have.
+    const rank = s => s[key] !== null && s[key] !== undefined
+      ? [0, s[key]]
+      : ((s.netCashPctMarketCap ?? 0) >= 30 ? [1, -s.netCashPctMarketCap] : [2, 0]);
     const passes = stocks.filter(x => x.r.pass)
-                         .sort((a,b)=>(a.s[key]??999)-(b.s[key]??999));
+                         .sort((a,b)=>{const A=rank(a.s),B=rank(b.s);
+                                       return A[0]-B[0] || A[1]-B[1];});
     const fails  = stocks.filter(x => !x.r.pass)
                          .sort((a,b)=>(a.s[key]??999)-(b.s[key]??999));
     const shown = passes.slice(0,10);
@@ -925,17 +955,31 @@
          <div class="ticker">${s.ticker} <span>ASX</span></div>
          <div class="name">${s.name}</div>
        </div>
-       <div class="pe"><b>${(s[VAL.key] ?? 0).toFixed(1)}</b><small>${VAL.short}</small></div>
+       <div class="pe">${headline(s)}</div>
        <div class="meta">
          <span class="chip sector">${s.sector}</span>
          <span class="chip">${s.industry}</span>
          <span class="chip cf">Cash-flow positive</span>
+         ${findsFor(s).map(([f,why]) =>
+            `<span class="chip find" title="${why}">${f}</span>`).join("")}
          ${flagsFor(s).map(([f,why]) =>
             `<span class="chip flag" title="${why}">${f}</span>`).join("")}
        </div>
        <div class="cardnote">${s.note}</div>
        ${statBlock(s)}`;
     return li;
+  }
+
+  // EV/EBIT is meaningless where enterprise value is negative, so a net-cash
+  // business shows its cash cover instead of an empty slot.
+  function headline(s){
+    const v = s[VAL.key];
+    if(v !== null && v !== undefined)
+      return `<b>${v.toFixed(1)}</b><small>${VAL.short}</small>`;
+    const c = s.netCashPctMarketCap;
+    if(c !== null && c !== undefined && c >= 30)
+      return `<b>${c.toFixed(0)}%</b><small>Net cash</small>`;
+    return `<b>&mdash;</b><small>${VAL.short}</small>`;
   }
 
   // Only the figures this dataset actually carries. An empty block renders
@@ -982,7 +1026,7 @@
     $("#flagCtl").hidden = !DATA.stocks.some(s => flagsFor(s).length);
   }
 
-  const BUILD = "2026-09-15.1";
+  const BUILD = "2026-09-17.1";
 
   function reportMode(){
     const installed = matchMedia("(display-mode: standalone)").matches

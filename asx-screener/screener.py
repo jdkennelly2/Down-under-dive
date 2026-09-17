@@ -127,7 +127,12 @@ ENERGY_HINTS = ("oil", "gas", "petroleum", "refin", "drilling", "coking",
 REIT_HINTS = ("reit", "real estate investment trust")
 # Asset managers specifically. Kept narrow so banks, insurers, lenders,
 # exchanges and leasing businesses are not swept up as "financials".
-FUND_MANAGER_HINTS = ("asset management", "fund manage", "investment manage")
+# Matched against INDUSTRY ONLY, never the company name. Premier Investments
+# is a retail operator; Australian Foundation Investment Company is a listed
+# investment company. The names give no reliable signal, the industry does.
+FUND_MANAGER_HINTS = ("asset management", "fund manage", "investment manage",
+                      "closed end fund", "closed-end fund", "investment company",
+                      "investment trust", "shell companies")
 
 # Statement line items are labelled inconsistently across filings, so every
 # lookup tries a list of aliases and gives up cleanly rather than guessing.
@@ -160,6 +165,8 @@ LINES = {
     "gross_profit": ("Gross Profit",),
     "debt": ("Total Debt", "Total Debt Net"),
     "payables": ("Payables", "Accounts Payable", "Payables And Accrued Expenses"),
+    "liabilities": ("Total Liabilities Net Minority Interest", "Total Liabilities",
+                    "Total Liabilities And Stockholders Equity"),
     "wc_payables": ("Change In Payable", "Change In Account Payable",
                     "Changes In Account Receivables"),
 }
@@ -235,11 +242,9 @@ def gross_margin_trend(inc):
     gp, rev = series(inc, "gross_profit", 2), series(inc, "revenue", 2)
     if len(gp) < 1 or len(rev) < 1 or not rev[0]:
         return None, None
-    # Some filers report no cost-of-sales line, so "gross profit" simply
-    # equals revenue and the margin computes to 100%. That is an absence of
-    # data, not a fat margin — report nothing rather than something false.
-    if gp[0] >= rev[0] * 0.995:
-        return None, None
+    # A margin of 100% means the filer reported no cost-of-sales line. That
+    # is worth seeing as-is: it says something about how the accounts are
+    # presented, and a reader knows how to take it. Reported, not hidden.
     now = round(100 * gp[0] / rev[0], 1)
     prior = round(100 * gp[1] / rev[1], 1) if len(gp) > 1 and len(rev) > 1 and rev[1] else None
     return now, (round(now - prior, 1) if prior is not None else None)
@@ -308,11 +313,29 @@ def tangible_equity(bs):
 
 
 def pct(v, already_pct=False):
-    """Normalise a rate to a percentage, or None when not reported."""
+    """Normalise a PROVIDER-SUPPLIED rate to a percentage.
+
+    yfinance returns some rates as fractions (0.0854) and others already as
+    percents (8.54), with no way to tell but magnitude — hence the guess.
+
+    Never use this on a ratio computed here: the guess breaks above 1.0, so a
+    company holding 125% of its market cap in net cash would report 1.25%.
+    That is the most interesting name on the screen, silently mangled. Use
+    as_pct() for anything derived."""
     if not isinstance(v, (int, float)):
         return None
-    # yfinance returns some rates as fractions (0.0854) and some as percents.
     return round(v if already_pct or v > 1 else v * 100, 2)
+
+
+def as_pct(num, den):
+    """A computed ratio as a percentage. No magnitude guessing: 250/200 is
+    125%, not 1.25%."""
+    if num is None or not den:
+        return None
+    try:
+        return round(100 * num / den, 2)
+    except (TypeError, ZeroDivisionError):
+        return None
 
 
 def dedupe(codes):
@@ -373,7 +396,9 @@ def is_reit(info):
 
 
 def is_fund_manager(info):
-    """An asset manager — not financials in general."""
+    """An asset manager, investment company or LIC — not financials in
+    general, and never inferred from the company name. "Premier Investments"
+    is a retailer; matching on names would wrongly exclude it."""
     industry = (info.get("industry") or "").lower()
     return any(h in industry for h in FUND_MANAGER_HINTS)
 
@@ -434,6 +459,17 @@ def fetch(code):
 
     gm, gm_delta = gross_margin_trend(inc)
 
+    # A business holding more net cash than its market capitalisation is
+    # close to being bought for free. EV/EBIT goes negative there and is
+    # meaningless, but the company is the most interesting thing on the
+    # screen, not an artefact to be hidden. Two tests, because cash offset
+    # by liabilities is not really cash:
+    #   net cash        = cash - borrowings
+    #   net of all debts= cash - total liabilities   (the stricter view)
+    liabilities = line(bs, "liabilities")
+    net_cash = (cash - debt) if (cash is not None and debt is not None) else None
+    net_of_all = (cash - liabilities) if (cash is not None and liabilities is not None) else None
+
     # A wide gap between the two owner's-earnings routes means leases or
     # working capital are doing heavy lifting — read the accounts by hand.
     divergence = None
@@ -458,21 +494,28 @@ def fetch(code):
         # A net-cash business can have negative enterprise value, which makes
         # EV/EBIT negative and sorts it to the top as the "cheapest" name in
         # the market. It is not cheap, the ratio is simply meaningless here.
+        # The ratio is omitted when EV is negative because it is not
+        # meaningful there — but netCashPctMarketCap below says why, and the
+        # NET-CASH flag makes sure the name still surfaces.
         "evEbit": ratio(ev, ebit) if (ev and ev > 0 and ebit and ebit > 0) else None,
+        "netCash": net_cash,
+        "netCashPctMarketCap": as_pct(net_cash, mcap),
+        "netCashOfAllLiabilities": net_of_all,
+        "netCashAfterAllLiabPct": as_pct(net_of_all, mcap),
         "ownerEarningsNpat": oe_npat,
         "ownerEarningsCfo": oe_cfo,
-        "oeYieldNpat": pct(ratio(oe_npat, mcap)),
-        "oeYieldCfo": pct(ratio(oe_cfo, mcap)),
+        "oeYieldNpat": as_pct(oe_npat, mcap),
+        "oeYieldCfo": as_pct(oe_cfo, mcap),
         "oeDivergence": divergence,
         "leaseLiabilities": lease,
         "leaseHeavy": bool(lease and ev and lease / ev > 0.15),
         "nta": nta,
         "tangibleCapitalEmployed": tce,
-        "rote": pct(ratio(npat, nta)) if (nta and nta > 0) else None,
-        "roteExCash": pct(ratio(npat, nta - cash)) if (nta and cash and nta - cash > 0) else None,
+        "rote": as_pct(npat, nta) if (nta and nta > 0) else None,
+        "roteExCash": as_pct(npat, nta - cash) if (nta and cash and nta - cash > 0) else None,
         # The core quality test: cash earnings after capex against the
         # tangible capital that produced them.
-        "oeReturnOnCapital": pct(ratio(oe_cfo, tce)) if (tce and tce > 0) else None,
+        "oeReturnOnCapital": as_pct(oe_cfo, tce) if (tce and tce > 0) else None,
         "grossMargin": gm,
         "grossMarginDelta": gm_delta,
         "revenueCagr": revenue_cagr(inc),
@@ -560,6 +603,11 @@ def main():
     # yield is that same hurdle expressed as a yield.
     ap.add_argument("--ev-ebit-max", type=float, default=8.0,
                     help="Maximum EV/EBIT (default 8)")
+    ap.add_argument("--net-cash-min", type=float, default=30.0,
+                    help="Surface anything holding net cash worth at least this "
+                         "%% of market capitalisation, whatever its multiple "
+                         "(default 30). Above 100 the cash exceeds the whole "
+                         "market cap.")
     ap.add_argument("--oe-yield-min", type=float, default=10.0,
                     help="Minimum owner's-earnings yield %%, CFO basis (default 10)")
     ap.add_argument("--min-return-on-capital", type=float, default=None,
@@ -619,7 +667,12 @@ def main():
         # Failing both is not value on this methodology.
         cheap_multiple = s["evEbit"] is not None and s["evEbit"] < args.ev_ebit_max
         cheap_yield = s["oeYieldCfo"] is not None and s["oeYieldCfo"] >= args.oe_yield_min
-        if not (cheap_multiple or cheap_yield):
+        # Third route in: a balance sheet carrying serious net cash is cheap
+        # in a way no earnings multiple captures, and EV/EBIT is negative
+        # (so omitted) in exactly those cases.
+        net_cash = (s["netCashPctMarketCap"] is not None
+                    and s["netCashPctMarketCap"] >= args.net_cash_min)
+        if not (cheap_multiple or cheap_yield or net_cash):
             return False
         if args.min_return_on_capital is not None:
             roc = s["oeReturnOnCapital"]
@@ -642,9 +695,17 @@ def main():
               "    the app will fall back to showing P/E. This is almost always an\n"
               "    out-of-date yfinance — see the warnings above.", file=sys.stderr)
 
-    # Cheapest on EV/EBIT first; names without one sort to the back.
-    matches = sorted([r for r in rows if keep(r)],
-                     key=lambda r: (r["evEbit"] is None, r["evEbit"] or 0))
+    def rank(r):
+        """Cheapest on EV/EBIT first, then the net-cash names, then the rest.
+        Without this second group a company whose cash exceeds its market cap
+        would sort last for having no EV/EBIT — burying the finding."""
+        if r["evEbit"] is not None:
+            return (0, r["evEbit"])
+        if (r["netCashPctMarketCap"] or 0) >= args.net_cash_min:
+            return (1, -r["netCashPctMarketCap"])
+        return (2, 0)
+
+    matches = sorted([r for r in rows if keep(r)], key=rank)
 
     payload = {
         "meta": {
@@ -683,15 +744,37 @@ def main():
             w.append("DIVERGE")
         return w
 
+    def notes_for(r):
+        """Findings rather than warnings — things worth a look, not a caution."""
+        n = []
+        pctc = r["netCashPctMarketCap"]
+        if pctc is not None and pctc >= 100:
+            n.append("CASH>MCAP")
+        elif pctc is not None and pctc >= args.net_cash_min:
+            n.append("NET-CASH")
+        return n
+
     print(f"\n=== {min(15, len(matches))} of {len(matches)} matches ===")
     print(f"{'#':>2}  {'CODE':5} {'EV/EBIT':>8} {'OE%cfo':>7} {'RoTC':>6} "
-          f"{'GM':>6} {'dGM':>6} {'REV%':>6}  {'WARNINGS':<22} NAME")
+          f"{'NetCash%':>9} {'GM':>6} {'dGM':>6} {'REV%':>6}  {'FLAGS':<26} NAME")
     for i, r in enumerate(matches[:15], 1):
+        flags = notes_for(r) + warnings_for(r)
         print(f"{i:2}. {r['ticker']:5} {fmt(r['evEbit']):>8} "
               f"{fmt(r['oeYieldCfo'],'%'):>7} {fmt(r['oeReturnOnCapital'],'%',0):>6} "
+              f"{fmt(r['netCashPctMarketCap'],'%',0):>9} "
               f"{fmt(r['grossMargin'],'%',0):>6} {fmt(r['grossMarginDelta'],'',1):>6} "
               f"{fmt(r['revenueCagr'],'%',0):>6}  "
-              f"{','.join(warnings_for(r)) or '-':<22} {r['name']}")
+              f"{','.join(flags) or '-':<26} {r['name']}")
+
+    cashy = [r for r in matches if (r["netCashPctMarketCap"] or 0) >= args.net_cash_min]
+    if cashy:
+        print("\nNet cash — cash less borrowings, against market cap. The stricter")
+        print("column nets off ALL liabilities, which is the test of whether the")
+        print("cash is really there:")
+        for r in cashy[:10]:
+            print(f"  {r['ticker']:5} net cash {fmt(r['netCashPctMarketCap'],'%',0):>6} of mcap"
+                  f"   after all liabilities {fmt(r['netCashAfterAllLiabPct'],'%',0):>7}"
+                  f"   EV/EBIT {fmt(r['evEbit']):>6}")
 
     roc = [r["oeReturnOnCapital"] for r in matches if r["oeReturnOnCapital"] is not None]
     if roc:

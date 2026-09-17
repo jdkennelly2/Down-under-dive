@@ -10,8 +10,11 @@ A small mobile-first app that screens **Australian (ASX) shares** for:
 5. **Not a REIT** — property trusts, whose earnings are distorted by
    revaluations. Real-estate *services* businesses (valuers, agents) are kept:
    they are operating companies, not trusts
-6. **Not a fund manager** — asset managers specifically, not financials
-   broadly, so banks, insurers, lenders and leasing businesses still qualify
+6. **Not a fund manager, investment company or LIC** — matched on *industry
+   only, never company name*. Premier Investments is a retail operator;
+   Australian Foundation Investment Company is a listed investment company.
+   The names tell you nothing. Banks, insurers, lenders and leasing
+   businesses still qualify — the exclusion is asset gatherers, not financials
 
 **Dividend yield** and **payout ratio** are shown for everything that passes, as
 extra context rather than screening criteria. A payout ratio above 100% is
@@ -91,15 +94,42 @@ That prints every row label on the income statement, cash flow and balance
 sheet for one company, then shows which of the lookups currently resolve and
 which come back MISSING. Add the real label to `LINES` in `screener.py`.
 
-Two notes on figures the screen will not show:
+**On EV/EBIT and negative enterprise value.** The *ratio* is omitted when EV
+is negative, because it is not meaningful — but the *company* is not. A
+business holding more net cash than its market capitalisation is close to
+being bought for free, which is the most interesting thing a screen can find.
+Those names get a third route in (see net cash below), keep their place near
+the top of the ranking, and headline their cash cover instead of a multiple.
 
-- **EV/EBIT is omitted when enterprise value is negative.** A business holding
-  more cash than its market capitalisation has negative EV, which makes the
-  ratio negative and sorts it to the top as the cheapest name on the market.
-  It is not cheap; the ratio is meaningless there.
-- **Gross margin is omitted when it computes to 100%.** Some filers report no
-  cost-of-sales line, so "gross profit" equals revenue. That is missing data,
-  not a fat margin.
+**Gross margin of 100% is reported as-is.** It means the filer reported no
+cost-of-sales line. That is worth seeing: it says something about how the
+accounts are presented, and a reader knows how to take it.
+
+## Net cash
+
+Cash is a third route into the screen, alongside a cheap multiple and a high
+owner's-earnings yield. Anything holding net cash worth **30%+ of market
+capitalisation** surfaces whatever its earnings look like
+(`--net-cash-min` to change the bar).
+
+Two measures, because cash offset by liabilities is not really cash:
+
+| Measure | Definition |
+|---------|------------|
+| `netCashPctMarketCap` | (cash − borrowings) ÷ market cap |
+| `netCashAfterAllLiabPct` | (cash − **all** liabilities) ÷ market cap — the stricter test |
+
+The second is the one that decides whether the cash is genuinely there. A
+company can show 130% of its market cap in net cash and almost none of it
+survive the full liability stack.
+
+Two findings are marked on the card, in a different colour from warnings
+because they are reasons to look, not reasons to doubt:
+
+| Find | Meaning |
+|------|---------|
+| `CASH>MCAP` | Net cash exceeds the entire market capitalisation |
+| `NET-CASH` | Net cash is at least 30% of market capitalisation |
 
 ## Warnings
 
