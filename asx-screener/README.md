@@ -266,7 +266,22 @@ screen. Get Python from python.org and tick **"Add Python to PATH"**.
 ```powershell
 py --version          # expect 3.9+
 py -m pip install -U yfinance
+py screener.py --help # confirm the same interpreter can see yfinance
 ```
+
+**If a just-installed package reports as missing**, more than one Python is
+present and `py` is resolving differently for `pip` than for the script. Check
+what is installed and which one wins:
+
+```powershell
+py -0                 # every interpreter the launcher knows; * marks default
+where.exe python3     # what a `python3` shebang would resolve to
+```
+
+The scripts here carry **no shebang line** for exactly this reason: the Windows
+launcher honours `#!/usr/bin/env python3` and will dispatch to whatever
+`python3` finds on PATH, which need not be the interpreter `py -m pip` installs
+into. Please don't add one back.
 
 ## Run the live screener
 

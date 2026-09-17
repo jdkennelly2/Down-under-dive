@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+# No shebang here on purpose. The Windows `py` launcher reads a
+# `#!/usr/bin/env python3` line and dispatches to whatever `python3`
+# resolves to on PATH, which can be a different interpreter from the
+# one `py -m pip` installs into — producing a baffling "not installed"
+# error for a package that was just installed. Run as: py <script>.py
 """Generate the Deep Value ASX app icons (full-bleed square; iOS masks corners)."""
 from PIL import Image, ImageDraw, ImageFont
 

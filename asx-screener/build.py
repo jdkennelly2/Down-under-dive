@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+# No shebang here on purpose. The Windows `py` launcher reads a
+# `#!/usr/bin/env python3` line and dispatches to whatever `python3`
+# resolves to on PATH, which can be a different interpreter from the
+# one `py -m pip` installs into — producing a baffling "not installed"
+# error for a package that was just installed. Run as: py <script>.py
 """
 Build the deployable site into ../docs/ — the folder GitHub Pages serves.
 
