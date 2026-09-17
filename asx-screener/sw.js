@@ -1,5 +1,5 @@
 // Offline shell for Deep Value ASX. Bump CACHE when you change the app.
-const CACHE = "deep-value-asx-v2";
+const CACHE = "deep-value-asx-v3";
 const CORE = [
   "./", "./index.html", "./data.json", "./manifest.webmanifest",
   "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"

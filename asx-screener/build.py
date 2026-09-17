@@ -16,6 +16,7 @@ from this repo. Run after editing app.html or refreshing data.json:
     python build.py
 """
 import shutil
+import re
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -26,6 +27,18 @@ src = (HERE / "app.html").read_text(encoding="utf-8")
 SPLIT = '<div class="wrap">'
 head_src, body_src = src.split(SPLIT, 1)
 body_src = SPLIT + body_src
+
+# The inline SEED is the offline fallback. Regenerate it from the data being
+# shipped: a fallback left behind at an older revision is worse than none,
+# because the app falls back to it silently and shows stale figures under a
+# fresh build number. Lambda replacement, so JSON backslash escapes are not
+# read as regex group references.
+_data = (HERE / "data.json").read_text(encoding="utf-8").strip()
+body_src, _n = re.subn(r"const SEED = \{.*?\n\s*\};\n",
+                       lambda m: "const SEED = " + _data + ";\n",
+                       body_src, count=1, flags=re.S)
+if _n != 1:
+    raise SystemExit("build.py: could not find the SEED block to refresh in app.html")
 
 HEAD = """<!doctype html>
 <html lang="en-AU">

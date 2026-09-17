@@ -103,6 +103,8 @@
   }
   .stamp b{color:var(--ink);font-weight:600;}
   .stamp .dot{color:var(--hair-strong);}
+  .stamp .stale{color:var(--warn);font-weight:600;}
+  .stamp .live{color:var(--pass);}
 
   /* ---- Criteria / controls ---- */
   .panel{
@@ -281,7 +283,8 @@
     <div class="stamp">
       <span>As of <b id="asOf">—</b></span><span class="dot">/</span>
       <span><b id="universeN">—</b> in universe</span><span class="dot">/</span>
-      <span><b id="matchN">—</b> pass</span>
+      <span><b id="matchN">—</b> pass</span><span class="dot">/</span>
+      <span id="dataSrc"></span>
     </div>
   </header>
 
@@ -1026,7 +1029,7 @@
     $("#flagCtl").hidden = !DATA.stocks.some(s => flagsFor(s).length);
   }
 
-  const BUILD = "2026-09-17.1";
+  const BUILD = "2026-09-17.2";
 
   function reportMode(){
     const installed = matchMedia("(display-mode: standalone)").matches
@@ -1051,19 +1054,36 @@
   function boot(){
     reportMode();
     configureForData();
+    const src = $("#dataSrc");
+    if(src){
+      src.className = usingBundled ? "stale" : "live";
+      src.textContent = usingBundled
+        ? `bundled copy${fallbackReason ? " — " + fallbackReason : ""}`
+        : "live";
+    }
     $("#asOf").textContent = DATA.meta.asOf;
     $("#universeN").textContent = DATA.stocks.length;
     $("#srcNote").textContent = DATA.meta.source;
     render();
   }
 
-  // Prefer live data.json when the page is served (not opened as a file / inlined artifact).
-  if(location.protocol.startsWith("http")){
-    fetch("data.json").then(r => r.ok ? r.json() : Promise.reject())
-      .then(j => { DATA = j; })
-      .catch(()=>{})
-      .finally(boot);
-  } else {
-    boot();
+  // The bundled copy is the offline fallback. Falling back is fine; falling
+  // back SILENTLY is not — it shows old figures under a new build number with
+  // nothing to say so. The stamp always reports which dataset is on screen.
+  let usingBundled = true, fallbackReason = "";
+
+  function loadData(){
+    if(!location.protocol.startsWith("http")) return Promise.resolve();
+    // Versioned and no-cache: a service worker or CDN holding an older
+    // data.json would otherwise quietly win.
+    return fetch(`data.json?v=${BUILD}`, {cache: "no-cache"})
+      .then(r => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))
+      .then(j => {
+        if(!j || !Array.isArray(j.stocks)) throw new Error("malformed data.json");
+        DATA = j; usingBundled = false;
+      })
+      .catch(err => { fallbackReason = err.message || String(err); });
   }
+
+  loadData().finally(boot);
 </script>
